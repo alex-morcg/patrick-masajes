@@ -272,17 +272,23 @@ export default function App() {
         await setDoc(doc(db, 'appointments', editItem.id), aptData);
       }
     } else {
-      const { skipDates = [], ...aptData } = data;
+      const { skipDates = [], recurrenceDuration, ...aptData } = data;
       const seriesId = aptData.recurrence ? generateId() : null;
       const base = new Date(aptData.dateTime);
-      let iterations = aptData.recurrence === 'weekly' ? 12 : aptData.recurrence === 'biweekly' ? 6 : aptData.recurrence === 'monthly' ? 3 : 1;
-      
+
+      // Calcular iteraciones basado en recurrenceDuration (en meses)
+      const months = recurrenceDuration || 6;
+      let iterations = 1;
+      if (aptData.recurrence === 'weekly') iterations = Math.round(months * 4.33);
+      else if (aptData.recurrence === 'biweekly') iterations = Math.round(months * 2.17);
+      else if (aptData.recurrence === 'monthly') iterations = months;
+
       for (let i = 0; i < iterations; i++) {
         const d = new Date(base);
         if (aptData.recurrence === 'weekly') d.setDate(d.getDate() + i * 7);
         if (aptData.recurrence === 'biweekly') d.setDate(d.getDate() + i * 14);
         if (aptData.recurrence === 'monthly') d.setMonth(d.getMonth() + i);
-        
+
         const dateStr = d.toISOString().split('T')[0];
         if (!skipDates.includes(dateStr)) {
           const id = generateId();
@@ -376,7 +382,7 @@ export default function App() {
       <div className="fixed top-0 left-0 right-0 bg-stone-800 p-3 flex items-center justify-between z-30 lg:hidden">
         <div>
           <h1 className="text-lg font-bold text-amber-200">Patrick</h1>
-          <p className="text-xs text-stone-500">v1.1</p>
+          <p className="text-xs text-stone-500">v1.2</p>
         </div>
         <button onClick={() => { setModal('appointment'); setEditItem(null); }} className="bg-amber-200 text-stone-800 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1">
           <Plus size={16} /> Cita
@@ -1312,6 +1318,7 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, e
   const [cost, setCost] = useState(apt?.cost?.toString() || '');
   const [selSpecials, setSelSpecials] = useState(apt?.specials || []);
   const [recurrence, setRecurrence] = useState(apt?.recurrence || '');
+  const [recurrenceDuration, setRecurrenceDuration] = useState('6'); // meses: 2, 6, 12
   const [skipConflictDates, setSkipConflictDates] = useState([]);
 
   const isPast = apt && new Date(apt.dateTime) < new Date();
@@ -1341,22 +1348,30 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, e
   };
   const conflicts = (date && time && duration) ? checkConflicts(currentAptData, apt?.id) : [];
 
+  const getIterations = () => {
+    const months = Number(recurrenceDuration);
+    if (recurrence === 'weekly') return Math.round(months * 4.33);
+    if (recurrence === 'biweekly') return Math.round(months * 2.17);
+    if (recurrence === 'monthly') return months;
+    return 1;
+  };
+
   const getRecurringConflicts = () => {
     if (apt || !recurrence) return [];
-    
+
     const baseDate = new Date(`${date}T${time}`);
-    let iterations = recurrence === 'weekly' ? 12 : recurrence === 'biweekly' ? 6 : recurrence === 'monthly' ? 3 : 1;
+    const iterations = getIterations();
     const conflictDates = [];
-    
+
     for (let i = 1; i < iterations; i++) {
       const d = new Date(baseDate);
       if (recurrence === 'weekly') d.setDate(d.getDate() + i * 7);
       if (recurrence === 'biweekly') d.setDate(d.getDate() + i * 14);
       if (recurrence === 'monthly') d.setMonth(d.getMonth() + i);
-      
+
       const aptData = { dateTime: d.toISOString(), duration: Number(duration) };
       const dateConflicts = checkConflicts(aptData, null);
-      
+
       if (dateConflicts.length > 0) {
         conflictDates.push({
           date: d,
@@ -1365,7 +1380,7 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, e
         });
       }
     }
-    
+
     return conflictDates;
   };
 
@@ -1379,7 +1394,7 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, e
 
   const handleSave = () => {
     if (!clientId) return;
-    
+
     const data = {
       clientId,
       dateTime: new Date(`${date}T${time}`).toISOString(),
@@ -1387,10 +1402,11 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, e
       cost: cost ? Number(cost) : null,
       specials: selSpecials,
       recurrence: apt ? apt.recurrence : (recurrence || null),
+      recurrenceDuration: apt ? apt.recurrenceDuration : (recurrence ? Number(recurrenceDuration) : null),
       seriesId: apt?.seriesId,
       skipDates: skipConflictDates
     };
-    
+
     onSave(data);
   };
 
@@ -1506,12 +1522,26 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, e
       {!apt && (
         <div>
           <label className="block text-sm font-medium text-stone-600 mb-1">Repetición</label>
-          <select value={recurrence} onChange={e => setRecurrence(e.target.value)} className="w-full p-3 border rounded-lg">
-            <option value="">Sin repetición</option>
-            <option value="weekly">Semanal</option>
-            <option value="biweekly">Cada 2 semanas</option>
-            <option value="monthly">Mensual</option>
-          </select>
+          <div className={recurrence ? 'grid grid-cols-2 gap-2' : ''}>
+            <select value={recurrence} onChange={e => setRecurrence(e.target.value)} className="w-full p-3 border rounded-lg">
+              <option value="">Sin repetición</option>
+              <option value="weekly">Semanal</option>
+              <option value="biweekly">Cada 2 semanas</option>
+              <option value="monthly">Mensual</option>
+            </select>
+            {recurrence && (
+              <select value={recurrenceDuration} onChange={e => setRecurrenceDuration(e.target.value)} className="w-full p-3 border rounded-lg">
+                <option value="2">2 meses</option>
+                <option value="6">6 meses</option>
+                <option value="12">1 año</option>
+              </select>
+            )}
+          </div>
+          {recurrence && (
+            <p className="text-xs text-stone-500 mt-1">
+              Se crearán {getIterations()} citas
+            </p>
+          )}
         </div>
       )}
       <div>
