@@ -376,7 +376,7 @@ export default function App() {
       <div className="fixed top-0 left-0 right-0 bg-stone-800 p-3 flex items-center justify-between z-30 lg:hidden">
         <div>
           <h1 className="text-lg font-bold text-amber-200">Patrick</h1>
-          <p className="text-xs text-stone-500">v1.0</p>
+          <p className="text-xs text-stone-500">v1.1</p>
         </div>
         <button onClick={() => { setModal('appointment'); setEditItem(null); }} className="bg-amber-200 text-stone-800 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1">
           <Plus size={16} /> Cita
