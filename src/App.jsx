@@ -382,7 +382,7 @@ export default function App() {
       <div className="fixed top-0 left-0 right-0 bg-stone-800 p-3 flex items-center justify-between z-30 lg:hidden">
         <div>
           <h1 className="text-lg font-bold text-amber-200">Patrick</h1>
-          <p className="text-xs text-stone-500">v1.3</p>
+          <p className="text-xs text-stone-500">v1.4</p>
         </div>
         <button onClick={() => { setModal('appointment'); setEditItem(null); }} className="bg-amber-200 text-stone-800 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1">
           <Plus size={16} /> Cita
@@ -416,7 +416,7 @@ export default function App() {
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-amber-200">Patrick</h1>
           <p className="text-xs text-stone-400 tracking-widest">MASAJES</p>
-          <p className="text-xs text-stone-500 mt-1">v1.3</p>
+          <p className="text-xs text-stone-500 mt-1">v1.4</p>
         </div>
         
         {[
@@ -798,7 +798,7 @@ export default function App() {
 
                         const weeks = getAllWeeksOfYear();
                         const today = new Date();
-                        const todayStr = today.toISOString().split('T')[0];
+                        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
                         // Comprobar si una semana contiene el primer día de un mes
                         const getMonthStart = (week) => {
@@ -851,12 +851,12 @@ export default function App() {
                                 return (
                                   <div
                                     key={dayIdx}
-                                    className={`${bgClass} p-1 min-h-[36px] relative cursor-pointer hover:ring-2 hover:ring-amber-300 border-l border-stone-200 ${isToday ? 'ring-2 ring-amber-500 ring-inset' : ''}`}
+                                    className={`${bgClass} p-1 min-h-[36px] relative cursor-pointer hover:ring-2 hover:ring-amber-300 border-l border-stone-200 ${isToday ? 'ring-2 ring-blue-500 ring-inset' : ''}`}
                                     onMouseEnter={() => aptCount > 0 && setHoveredDay(dateStr)}
                                     onMouseLeave={() => setHoveredDay(null)}
                                     onClick={() => { setCurrentDate(date); setCalView('day'); }}
                                   >
-                                    <div className={`text-xs font-medium ${textClass} ${isToday ? 'bg-amber-400 text-white rounded-full w-5 h-5 flex items-center justify-center' : ''}`}>
+                                    <div className={`text-xs font-medium ${textClass} ${isToday ? 'bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center' : ''}`}>
                                       {date.getDate()}
                                     </div>
 
