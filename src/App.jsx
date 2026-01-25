@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Users, BarChart3, Plus, ChevronLeft, ChevronRight, Edit2, Trash2, X, Tag, Check, Phone, Repeat, Clock, AlertTriangle, CalendarOff, Loader, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Calendar, Users, BarChart3, Plus, ChevronLeft, ChevronRight, Edit2, Trash2, X, Tag, Check, Phone, Repeat, Clock, AlertTriangle, CalendarOff, Loader, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle } from 'lucide-react';
 import { db, collection, doc, setDoc, onSnapshot, deleteDoc } from './firebase';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -382,7 +382,7 @@ export default function App() {
       <div className="fixed top-0 left-0 right-0 bg-stone-800 p-3 flex items-center justify-between z-30 lg:hidden">
         <div>
           <h1 className="text-lg font-bold text-amber-200">Patrick</h1>
-          <p className="text-xs text-stone-500">v1.2</p>
+          <p className="text-xs text-stone-500">v1.3</p>
         </div>
         <button onClick={() => { setModal('appointment'); setEditItem(null); }} className="bg-amber-200 text-stone-800 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1">
           <Plus size={16} /> Cita
@@ -926,7 +926,14 @@ export default function App() {
                 <div key={c.id} className="bg-white p-3 lg:p-6 rounded-xl shadow-sm flex items-center gap-3 lg:block">
                   <div className="w-10 h-10 lg:w-14 lg:h-14 bg-amber-200 rounded-xl flex items-center justify-center text-sm lg:text-xl font-bold lg:mb-4 flex-shrink-0">{c.nombre?.[0]}{c.apellido?.[0]}</div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm lg:text-lg truncate">{c.nombre} {c.apellido}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-sm lg:text-lg truncate">{c.nombre} {c.apellido}</h3>
+                      {c.whatsappReminder && (
+                        <span className="text-green-500" title={`Recordatorio: ${c.whatsappReminder === '24h' ? '24h antes' : c.whatsappReminder === '48h' ? '48h antes' : '1 semana antes'}`}>
+                          <MessageCircle size={14} />
+                        </span>
+                      )}
+                    </div>
                     <p className="flex items-center gap-1 text-stone-500 text-xs lg:text-sm"><Phone size={12} />{c.telefono}</p>
                   </div>
                   <div className="flex gap-1 lg:pt-4 lg:mt-4 lg:border-t">
@@ -1285,6 +1292,7 @@ function ClientForm({ client, onSave, onCancel }) {
   const [nombre, setNombre] = useState(client?.nombre || '');
   const [apellido, setApellido] = useState(client?.apellido || '');
   const [telefono, setTelefono] = useState(client?.telefono || '');
+  const [whatsappReminder, setWhatsappReminder] = useState(client?.whatsappReminder || '');
 
   return (
     <div className="space-y-4">
@@ -1298,11 +1306,23 @@ function ClientForm({ client, onSave, onCancel }) {
       </div>
       <div>
         <label className="block text-sm font-medium text-stone-600 mb-1">Teléfono</label>
-        <input value={telefono} onChange={e => setTelefono(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-200 outline-none" />
+        <input value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="612345678" className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-200 outline-none" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-stone-600 mb-1">Recordatorio WhatsApp</label>
+        <select value={whatsappReminder} onChange={e => setWhatsappReminder(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-200 outline-none">
+          <option value="">Sin recordatorio</option>
+          <option value="24h">24 horas antes</option>
+          <option value="48h">48 horas antes</option>
+          <option value="1week">1 semana antes</option>
+        </select>
+        {whatsappReminder && (
+          <p className="text-xs text-stone-500 mt-1">Se enviará un recordatorio automático por WhatsApp</p>
+        )}
       </div>
       <div className="flex gap-3 pt-4">
         <button onClick={onCancel} className="flex-1 py-3 border rounded-lg font-medium hover:bg-stone-50">Cancelar</button>
-        <button onClick={() => nombre && apellido && telefono && onSave({ nombre, apellido, telefono })} className="flex-1 py-3 bg-stone-800 text-amber-200 rounded-lg font-medium hover:bg-stone-700">{client ? 'Guardar' : 'Crear'}</button>
+        <button onClick={() => nombre && apellido && telefono && onSave({ nombre, apellido, telefono, whatsappReminder: whatsappReminder || null })} className="flex-1 py-3 bg-stone-800 text-amber-200 rounded-lg font-medium hover:bg-stone-700">{client ? 'Guardar' : 'Crear'}</button>
       </div>
     </div>
   );
