@@ -123,6 +123,7 @@ export default function App() {
   const [showCompleted, setShowCompleted] = useState(false);
   const [statsSortKey, setStatsSortKey] = useState('nombre');
   const [statsSortDir, setStatsSortDir] = useState('asc');
+  const [hoveredDay, setHoveredDay] = useState(null);
 
   // Cargar datos de Firebase en tiempo real
   useEffect(() => {
@@ -228,6 +229,7 @@ export default function App() {
     const d = new Date(currentDate);
     if (calView === 'day') d.setDate(d.getDate() + dir);
     else if (calView === 'week') d.setDate(d.getDate() + dir * 7);
+    else if (calView === 'year') d.setFullYear(d.getFullYear() + dir);
     else d.setMonth(d.getMonth() + dir);
     setCurrentDate(d);
   };
@@ -451,6 +453,7 @@ export default function App() {
                   {calView === 'day' && formatDate(currentDate)}
                   {calView === 'week' && `${formatDate(getWeekDays(currentDate)[0])} - ${formatDate(getWeekDays(currentDate)[6])}`}
                   {calView === 'month' && currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                  {calView === 'year' && currentDate.getFullYear()}
                 </h3>
               </div>
               <button onClick={() => navigate(1)} className="p-2 hover:bg-stone-100 rounded-lg"><ChevronRight size={20} /></button>
@@ -458,9 +461,9 @@ export default function App() {
 
             {/* Vista tabs */}
             <div className="flex gap-1 bg-stone-100 p-1 rounded-lg mb-4 lg:mb-6">
-              {['list', 'day', 'week', 'month'].map(v => (
+              {['list', 'day', 'week', 'month', 'year'].map(v => (
                 <button key={v} onClick={() => setCalView(v)} className={`flex-1 py-2 rounded-md text-xs lg:text-sm font-medium transition-all ${calView === v ? 'bg-white shadow-sm' : 'hover:bg-stone-200'}`}>
-                  {v === 'list' ? 'Lista' : v === 'day' ? 'Día' : v === 'week' ? 'Sem' : 'Mes'}
+                  {v === 'list' ? 'Lista' : v === 'day' ? 'Día' : v === 'week' ? 'Sem' : v === 'month' ? 'Mes' : 'Año'}
                 </button>
               ))}
             </div>
@@ -610,11 +613,40 @@ export default function App() {
                     const apts = getAptsForDate(obj.date);
                     const isPastDay = obj.date < new Date(new Date().setHours(0,0,0,0));
                     const holiday = isHoliday(obj.date);
+                    const dateStr = obj.date.toISOString().split('T')[0];
                     return (
-                      <div key={i} onClick={() => { setCurrentDate(obj.date); setCalView('day'); }} className={`p-1 lg:p-2 min-h-16 lg:min-h-24 border-b border-r cursor-pointer hover:bg-amber-50 ${!obj.isCurrentMonth ? 'bg-stone-50 opacity-50' : isPastDay ? 'bg-stone-100' : holiday ? 'bg-red-50' : ''} ${isSameDay(obj.date, new Date()) ? 'bg-amber-100' : ''}`}>
+                      <div
+                        key={i}
+                        onClick={() => { setCurrentDate(obj.date); setCalView('day'); }}
+                        onMouseEnter={() => apts.length > 0 && setHoveredDay(dateStr)}
+                        onMouseLeave={() => setHoveredDay(null)}
+                        className={`p-1 lg:p-2 min-h-16 lg:min-h-24 border-b border-r cursor-pointer hover:bg-amber-50 relative ${!obj.isCurrentMonth ? 'bg-stone-50 opacity-50' : isPastDay ? 'bg-stone-100' : holiday ? 'bg-red-50' : ''} ${isSameDay(obj.date, new Date()) ? 'bg-amber-100' : ''}`}
+                      >
                         <div className={`w-6 h-6 lg:w-7 lg:h-7 flex items-center justify-center rounded-full text-xs lg:text-sm ${isSameDay(obj.date, new Date()) ? 'bg-amber-300 font-bold' : isPastDay ? 'text-stone-400' : holiday ? 'bg-red-200 text-red-700' : ''}`}>{obj.date.getDate()}</div>
                         {holiday && <div className="text-xs text-red-600 truncate hidden lg:block">{holiday.name}</div>}
-                        {apts.length > 0 && <span className={`text-xs px-1 lg:px-2 py-0.5 lg:py-1 rounded-full ${isPastDay ? 'bg-stone-200 text-stone-500' : 'bg-stone-200'}`}>{apts.length}</span>}
+                        {apts.length > 0 && <span className={`text-xs px-1 lg:px-2 py-0.5 lg:py-1 rounded-full ${isPastDay ? 'bg-stone-200 text-stone-500' : 'bg-amber-200'}`}>{apts.length}</span>}
+
+                        {/* Tooltip on hover */}
+                        {hoveredDay === dateStr && apts.length > 0 && (
+                          <div className="absolute z-50 left-0 top-full mt-1 bg-white border rounded-lg shadow-lg p-2 min-w-[160px]" onClick={e => e.stopPropagation()}>
+                            <div className="text-xs font-semibold mb-2 text-stone-700">
+                              {obj.date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+                            </div>
+                            <div className="space-y-1">
+                              {apts.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime)).map(apt => {
+                                const c = getClient(apt.clientId);
+                                const aptSpecial = specials.find(s => apt.specials?.includes(s.id));
+                                const bgColor = aptSpecial?.color || 'bg-amber-100';
+                                return (
+                                  <div key={apt.id} className={`text-xs flex items-center gap-1 px-2 py-1 rounded ${bgColor}`}>
+                                    <span className="font-medium">{formatTime(apt.dateTime)}</span>
+                                    <span className="truncate">{c?.nombre} {c?.apellido}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -710,6 +742,163 @@ export default function App() {
                         );
                       });
                     })()}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {calView === 'year' && (
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <div className="min-w-[900px]">
+                    {/* Header con días de la semana */}
+                    <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b-2 border-stone-300">
+                      <div className="bg-stone-50 p-2 text-xs font-semibold text-stone-500"></div>
+                      {['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'].map(d => (
+                        <div key={d} className="bg-stone-50 p-2 text-xs font-semibold text-stone-500 text-center border-l border-stone-200">{d}</div>
+                      ))}
+                    </div>
+
+                    {/* Grid del año */}
+                    <div>
+                      {(() => {
+                        const year = currentDate.getFullYear();
+                        const monthNames = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+
+                        // Generar todas las semanas del año
+                        const getAllWeeksOfYear = () => {
+                          const weeks = [];
+                          const startDate = new Date(year, 0, 1);
+                          const endDate = new Date(year, 11, 31);
+
+                          // Encontrar el lunes de la semana que contiene el 1 de enero
+                          let current = new Date(startDate);
+                          const dayOfWeek = current.getDay();
+                          const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+                          current.setDate(current.getDate() + diff);
+
+                          // Generar semanas hasta pasar el 31 de diciembre
+                          while (current <= endDate || current.getDay() !== 1) {
+                            const week = [];
+                            for (let i = 0; i < 7; i++) {
+                              week.push(new Date(current));
+                              current.setDate(current.getDate() + 1);
+                            }
+                            weeks.push(week);
+                            if (current > endDate && current.getDay() === 1) break;
+                          }
+                          return weeks;
+                        };
+
+                        const weeks = getAllWeeksOfYear();
+                        const today = new Date();
+                        const todayStr = today.toISOString().split('T')[0];
+
+                        // Comprobar si una semana contiene el primer día de un mes
+                        const getMonthStart = (week) => {
+                          return week.find(d => d.getDate() === 1 && d.getFullYear() === year);
+                        };
+
+                        return weeks.map((week, weekIdx) => {
+                          const monthLabelDay = getMonthStart(week);
+                          const isMonthStart = !!monthLabelDay;
+
+                          return (
+                            <div
+                              key={weekIdx}
+                              className={`grid grid-cols-[60px_repeat(7,1fr)] border-b border-stone-200 ${isMonthStart ? 'border-t-2 border-t-stone-400' : ''}`}
+                            >
+                              {/* Columna del mes */}
+                              <div className={`bg-stone-50 p-1 text-xs font-bold text-stone-700 flex items-center justify-center border-r border-stone-200 ${isMonthStart ? 'bg-stone-100' : ''}`}>
+                                {monthLabelDay && monthNames[monthLabelDay.getMonth()]}
+                              </div>
+
+                              {/* Días */}
+                              {week.map((date, dayIdx) => {
+                                const dateStr = date.toISOString().split('T')[0];
+                                const isCurrentYear = date.getFullYear() === year;
+                                const holiday = isHoliday(date);
+                                const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                                const isToday = dateStr === todayStr;
+                                const apts = isCurrentYear ? getAptsForDate(date) : [];
+                                const aptCount = apts.length;
+                                const isPastDay = date < new Date(new Date().setHours(0,0,0,0));
+
+                                // Determinar color de fondo
+                                let bgClass = 'bg-white';
+                                let textClass = 'text-stone-900';
+
+                                if (!isCurrentYear) {
+                                  bgClass = 'bg-stone-50';
+                                  textClass = 'text-stone-300';
+                                } else if (holiday) {
+                                  bgClass = 'bg-red-100';
+                                  textClass = 'text-red-700';
+                                } else if (isWeekend) {
+                                  bgClass = 'bg-stone-100';
+                                  textClass = 'text-stone-400';
+                                } else if (isPastDay) {
+                                  bgClass = 'bg-stone-50';
+                                  textClass = 'text-stone-400';
+                                }
+
+                                return (
+                                  <div
+                                    key={dayIdx}
+                                    className={`${bgClass} p-1 min-h-[36px] relative cursor-pointer hover:ring-2 hover:ring-amber-300 border-l border-stone-200 ${isToday ? 'ring-2 ring-amber-500 ring-inset' : ''}`}
+                                    onMouseEnter={() => aptCount > 0 && setHoveredDay(dateStr)}
+                                    onMouseLeave={() => setHoveredDay(null)}
+                                    onClick={() => { setCurrentDate(date); setCalView('day'); }}
+                                  >
+                                    <div className={`text-xs font-medium ${textClass} ${isToday ? 'bg-amber-400 text-white rounded-full w-5 h-5 flex items-center justify-center' : ''}`}>
+                                      {date.getDate()}
+                                    </div>
+
+                                    {/* Indicador de festivo */}
+                                    {holiday && isCurrentYear && (
+                                      <div className="absolute bottom-0.5 left-0.5">
+                                        <span className="text-[8px] text-red-600 truncate max-w-full block leading-tight">{holiday.name.slice(0, 8)}</span>
+                                      </div>
+                                    )}
+
+                                    {/* Badge de citas */}
+                                    {isCurrentYear && aptCount > 0 && (
+                                      <div className="absolute bottom-0.5 right-0.5">
+                                        <div className={`${isPastDay ? 'bg-stone-400' : 'bg-amber-500'} text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1`}>
+                                          {aptCount}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Tooltip on hover */}
+                                    {hoveredDay === dateStr && aptCount > 0 && (
+                                      <div className="absolute z-50 left-0 top-full mt-1 bg-white border rounded-lg shadow-lg p-2 min-w-[160px]" onClick={e => e.stopPropagation()}>
+                                        <div className="text-xs font-semibold mb-2 text-stone-700">
+                                          {date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                        </div>
+                                        <div className="space-y-1">
+                                          {apts.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime)).map(apt => {
+                                            const c = getClient(apt.clientId);
+                                            const aptSpecial = specials.find(s => apt.specials?.includes(s.id));
+                                            const bgColor = aptSpecial?.color || 'bg-amber-100';
+                                            return (
+                                              <div key={apt.id} className={`text-xs flex items-center gap-1 px-2 py-1 rounded ${bgColor}`}>
+                                                <span className="font-medium">{formatTime(apt.dateTime)}</span>
+                                                <span className="truncate">{c?.nombre} {c?.apellido}</span>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
                   </div>
                 </div>
               </div>
