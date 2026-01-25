@@ -416,7 +416,7 @@ export default function App() {
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-amber-200">Patrick</h1>
           <p className="text-xs text-stone-400 tracking-widest">MASAJES</p>
-          <p className="text-xs text-stone-500 mt-1">v1.0</p>
+          <p className="text-xs text-stone-500 mt-1">v1.3</p>
         </div>
         
         {[
