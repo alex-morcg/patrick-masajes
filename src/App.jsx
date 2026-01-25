@@ -382,7 +382,7 @@ export default function App() {
       <div className="fixed top-0 left-0 right-0 bg-stone-800 p-3 flex items-center justify-between z-30 lg:hidden">
         <div>
           <h1 className="text-lg font-bold text-amber-200">Patrick</h1>
-          <p className="text-xs text-stone-500">v1.4</p>
+          <p className="text-xs text-stone-500">v1.5</p>
         </div>
         <button onClick={() => { setModal('appointment'); setEditItem(null); }} className="bg-amber-200 text-stone-800 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1">
           <Plus size={16} /> Cita
@@ -416,7 +416,7 @@ export default function App() {
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-amber-200">Patrick</h1>
           <p className="text-xs text-stone-400 tracking-widest">MASAJES</p>
-          <p className="text-xs text-stone-500 mt-1">v1.4</p>
+          <p className="text-xs text-stone-500 mt-1">v1.5</p>
         </div>
         
         {[
@@ -798,7 +798,6 @@ export default function App() {
 
                         const weeks = getAllWeeksOfYear();
                         const today = new Date();
-                        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
                         // Comprobar si una semana contiene el primer día de un mes
                         const getMonthStart = (week) => {
@@ -821,11 +820,11 @@ export default function App() {
 
                               {/* Días */}
                               {week.map((date, dayIdx) => {
-                                const dateStr = date.toISOString().split('T')[0];
+                                const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
                                 const isCurrentYear = date.getFullYear() === year;
                                 const holiday = isHoliday(date);
                                 const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                                const isToday = dateStr === todayStr;
+                                const isToday = isSameDay(date, today);
                                 const apts = isCurrentYear ? getAptsForDate(date) : [];
                                 const aptCount = apts.length;
                                 const isPastDay = date < new Date(new Date().setHours(0,0,0,0));
