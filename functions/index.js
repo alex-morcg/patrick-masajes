@@ -1,6 +1,7 @@
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onRequest } = require("firebase-functions/v2/https");
+const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const twilio = require("twilio");
 const { initializeApp } = require("firebase-admin/app");
@@ -15,6 +16,16 @@ setGlobalOptions({ maxInstances: 10, region: "europe-west1" });
 // Twilio config
 const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
 const twilioWhatsApp = `whatsapp:${process.env.TWILIO_WHATSAPP}`;
+
+// Admin phone number
+const ADMIN_PHONE = "whatsapp:+34615412222";
+
+// URLs de las apps
+const VACATION_APP_URL = "https://horarios-vacaciones.vercel.app";
+
+// ============================================
+// FUNCIONES COMPARTIDAS
+// ============================================
 
 // Enviar mensaje de WhatsApp
 const sendWhatsApp = async (to, message) => {
@@ -33,7 +44,7 @@ const sendWhatsApp = async (to, message) => {
 };
 
 // Formatear fecha en español
-const formatDate = (date) => {
+const formatDateES = (date) => {
   return date.toLocaleDateString('es-ES', {
     weekday: 'long',
     day: 'numeric',
@@ -49,15 +60,18 @@ const formatTime = (date) => {
   });
 };
 
+// ============================================
+// PATRICK MASAJES - RECORDATORIOS DE CITAS
+// ============================================
+
 // Función programada que se ejecuta cada hora para enviar recordatorios
-// Revisa las citas y envía recordatorios según la preferencia del cliente
 exports.sendAppointmentReminders = onSchedule(
   {
     schedule: "0 * * * *", // Cada hora en punto
     timeZone: "Europe/Madrid",
   },
   async (event) => {
-    logger.info("Ejecutando verificación de recordatorios...");
+    logger.info("Ejecutando verificación de recordatorios de citas...");
 
     const now = new Date();
 
@@ -82,7 +96,6 @@ exports.sendAppointmentReminders = onSchedule(
     appointmentsSnapshot.forEach(doc => {
       const data = doc.data();
       const aptDate = new Date(data.dateTime);
-      // Solo citas futuras
       if (aptDate > now) {
         appointments.push({ id: doc.id, ...data });
       }
@@ -90,7 +103,7 @@ exports.sendAppointmentReminders = onSchedule(
 
     logger.info(`Verificando ${appointments.length} citas futuras para ${Object.keys(clients).length} clientes con WhatsApp`);
 
-    // Obtener recordatorios ya enviados (para no duplicar)
+    // Obtener recordatorios ya enviados
     const sentRemindersSnapshot = await db.collection("sent_reminders").get();
     const sentReminders = new Set();
     sentRemindersSnapshot.forEach(doc => {
@@ -106,8 +119,6 @@ exports.sendAppointmentReminders = onSchedule(
       const aptDate = new Date(apt.dateTime);
       const hoursUntilApt = (aptDate - now) / (1000 * 60 * 60);
 
-      // Determinar si debemos enviar recordatorio según preferencia
-      // whatsappReminder: '24h', '48h', '1week'
       let shouldSend = false;
       let reminderKey = `${apt.id}_${client.whatsappReminder}`;
 
@@ -119,11 +130,10 @@ exports.sendAppointmentReminders = onSchedule(
         shouldSend = true;
       }
 
-      // Verificar si ya se envió este recordatorio
       if (shouldSend && !sentReminders.has(reminderKey)) {
         const message = `🗓️ Recordatorio de cita\n\n` +
           `Hola ${client.nombre}! Te recordamos tu cita de masaje:\n\n` +
-          `📅 ${formatDate(aptDate)}\n` +
+          `📅 ${formatDateES(aptDate)}\n` +
           `🕐 ${formatTime(aptDate)}\n` +
           `⏱️ Duración: ${apt.duration} minutos\n\n` +
           `¡Te esperamos!`;
@@ -132,7 +142,6 @@ exports.sendAppointmentReminders = onSchedule(
         const sent = await sendWhatsApp(`whatsapp:${phone}`, message);
 
         if (sent) {
-          // Guardar que ya se envió este recordatorio
           await db.collection("sent_reminders").doc(reminderKey).set({
             appointmentId: apt.id,
             clientId: apt.clientId,
@@ -144,16 +153,9 @@ exports.sendAppointmentReminders = onSchedule(
       }
     }
 
-    logger.info(`Recordatorios enviados: ${remindersSent}`);
+    logger.info(`Recordatorios de citas enviados: ${remindersSent}`);
   }
 );
-
-// Endpoint de prueba para enviar un WhatsApp
-exports.testWhatsApp = onRequest(async (req, res) => {
-  const phone = req.query.phone || "+34615412222";
-  const result = await sendWhatsApp(`whatsapp:${phone}`, "🧪 Prueba de recordatorio de Patrick Masajes!");
-  res.json({ success: result });
-});
 
 // Endpoint manual para enviar recordatorio a una cita específica
 exports.sendReminder = onRequest(async (req, res) => {
@@ -188,7 +190,7 @@ exports.sendReminder = onRequest(async (req, res) => {
   const aptDate = new Date(apt.dateTime);
   const message = `🗓️ Recordatorio de cita\n\n` +
     `Hola ${client.nombre}! Te recordamos tu cita de masaje:\n\n` +
-    `📅 ${formatDate(aptDate)}\n` +
+    `📅 ${formatDateES(aptDate)}\n` +
     `🕐 ${formatTime(aptDate)}\n` +
     `⏱️ Duración: ${apt.duration} minutos\n\n` +
     `¡Te esperamos!`;
@@ -197,4 +199,147 @@ exports.sendReminder = onRequest(async (req, res) => {
   const result = await sendWhatsApp(`whatsapp:${phone}`, message);
 
   res.json({ success: result, phone, message });
+});
+
+// ============================================
+// VACATION MANAGER - SOLICITUDES DE VACACIONES
+// ============================================
+
+// Obtener fechas de una solicitud de vacaciones
+const getRequestDates = (request) => {
+  if (request.isRange) {
+    const dates = [];
+    let cur = new Date(request.startDate);
+    const end = new Date(request.endDate);
+    while (cur <= end) {
+      const dateStr = cur.toISOString().split("T")[0];
+      const dayOfWeek = cur.getDay();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        dates.push(dateStr);
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    return dates;
+  }
+  return request.dates || [];
+};
+
+// Buscar conflictos con otros usuarios del mismo departamento
+const findConflicts = async (request, userCode) => {
+  try {
+    const userSnapshot = await db.collection("vacation_users").where("code", "==", userCode).get();
+    if (userSnapshot.empty) return [];
+
+    const user = userSnapshot.docs[0].data();
+    const userDepts = user.departments || [];
+    if (userDepts.length === 0) return [];
+
+    const requestDates = getRequestDates(request);
+    if (requestDates.length === 0) return [];
+
+    const requestsSnapshot = await db.collection("vacation_requests")
+      .where("status", "in", ["approved", "pending"])
+      .get();
+
+    const conflicts = [];
+
+    for (const doc of requestsSnapshot.docs) {
+      const otherReq = doc.data();
+      if (otherReq.userCode === userCode) continue;
+
+      const otherUserSnapshot = await db.collection("vacation_users").where("code", "==", otherReq.userCode).get();
+      if (otherUserSnapshot.empty) continue;
+
+      const otherUser = otherUserSnapshot.docs[0].data();
+      const otherDepts = otherUser.departments || [];
+      const sharedDepts = userDepts.filter(d => otherDepts.includes(d));
+
+      if (sharedDepts.length === 0) continue;
+
+      const otherDates = getRequestDates(otherReq);
+      const overlapping = requestDates.filter(d => otherDates.includes(d));
+
+      if (overlapping.length > 0) {
+        conflicts.push({
+          userName: `${otherUser.name} ${otherUser.lastName || ""}`.trim(),
+          userCode: otherReq.userCode,
+          dates: overlapping,
+          status: otherReq.status,
+          sharedDepts
+        });
+      }
+    }
+
+    return conflicts;
+  } catch (error) {
+    logger.error("Error buscando conflictos:", error);
+    return [];
+  }
+};
+
+// Cuando se crea una nueva solicitud de vacaciones -> avisar al admin
+exports.onVacationRequestCreated = onDocumentCreated(
+  "vacation_requests/{requestId}",
+  async (event) => {
+    const data = event.data.data();
+
+    if (data.status !== "pending") return;
+
+    const conflicts = await findConflicts(data, data.userCode);
+
+    let message = `📋 Nueva solicitud de vacaciones\n\n`;
+    message += `👤 Usuario: ${data.userCode}\n`;
+    message += `📅 Fechas: ${data.isRange ? `${data.startDate} al ${data.endDate}` : data.dates?.join(", ")}\n`;
+
+    if (data.comments) {
+      message += `💬 Comentarios: ${data.comments}\n`;
+    }
+
+    if (conflicts.length > 0) {
+      message += `\n⚠️ CONFLICTOS DETECTADOS:\n`;
+      conflicts.forEach(c => {
+        message += `• ${c.userName} (${c.sharedDepts.join(", ")}) - ${c.status === "approved" ? "✅" : "⏳"} ${c.dates.length} día(s)\n`;
+      });
+    }
+
+    message += `\n🔗 Ver solicitud: ${VACATION_APP_URL}`;
+
+    await sendWhatsApp(ADMIN_PHONE, message);
+  }
+);
+
+// Cuando se actualiza una solicitud (aprobada/denegada) -> avisar al empleado
+exports.onVacationRequestUpdated = onDocumentUpdated(
+  "vacation_requests/{requestId}",
+  async (event) => {
+    const before = event.data.before.data();
+    const after = event.data.after.data();
+
+    if (before.status === "pending" && (after.status === "approved" || after.status === "denied")) {
+      const statusText = after.status === "approved" ? "✅ APROBADA" : "❌ DENEGADA";
+      const message = `${statusText}\n\nTu solicitud de vacaciones ha sido ${after.status === "approved" ? "aprobada" : "denegada"}.\n\nFechas: ${after.isRange ? `${after.startDate} al ${after.endDate}` : after.dates?.join(", ")}`;
+
+      const usersSnapshot = await db.collection("vacation_users").where("code", "==", after.userCode).get();
+
+      if (!usersSnapshot.empty) {
+        const userData = usersSnapshot.docs[0].data();
+        if (userData.phone && userData.whatsappNotifications) {
+          await sendWhatsApp(`whatsapp:${userData.phone}`, message);
+        } else {
+          logger.info(`Usuario ${after.userCode} no tiene WhatsApp configurado o notificaciones desactivadas`);
+        }
+      }
+
+      await sendWhatsApp(ADMIN_PHONE, `[Admin] Solicitud de ${after.userCode} ${after.status === "approved" ? "aprobada" : "denegada"}`);
+    }
+  }
+);
+
+// ============================================
+// ENDPOINT DE PRUEBA
+// ============================================
+
+exports.testWhatsApp = onRequest(async (req, res) => {
+  const result = await sendWhatsApp(ADMIN_PHONE, "🧪 Prueba de WhatsApp!");
+  res.json({ success: result });
 });
