@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Users, BarChart3, Plus, ChevronLeft, ChevronRight, Edit2, Trash2, X, Tag, Check, Phone, Repeat, Clock, AlertTriangle, CalendarOff, Loader } from 'lucide-react';
+import { Calendar, Users, BarChart3, Plus, ChevronLeft, ChevronRight, Edit2, Trash2, X, Tag, Check, Phone, Repeat, Clock, AlertTriangle, CalendarOff, Loader, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { db, collection, doc, setDoc, onSnapshot, deleteDoc } from './firebase';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -121,6 +121,8 @@ export default function App() {
   const [confirmDel, setConfirmDel] = useState(null);
   const [editFuture, setEditFuture] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [statsSortKey, setStatsSortKey] = useState('nombre');
+  const [statsSortDir, setStatsSortDir] = useState('asc');
 
   // Cargar datos de Firebase en tiempo real
   useEffect(() => {
@@ -370,7 +372,10 @@ export default function App() {
     <div className="min-h-screen bg-amber-50 pb-20 lg:pb-0 lg:flex">
       {/* Mobile Header */}
       <div className="fixed top-0 left-0 right-0 bg-stone-800 p-3 flex items-center justify-between z-30 lg:hidden">
-        <h1 className="text-lg font-bold text-amber-200">Patrick</h1>
+        <div>
+          <h1 className="text-lg font-bold text-amber-200">Patrick</h1>
+          <p className="text-xs text-stone-500">v1.0</p>
+        </div>
         <button onClick={() => { setModal('appointment'); setEditItem(null); }} className="bg-amber-200 text-stone-800 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1">
           <Plus size={16} /> Cita
         </button>
@@ -403,6 +408,7 @@ export default function App() {
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-amber-200">Patrick</h1>
           <p className="text-xs text-stone-400 tracking-widest">MASAJES</p>
+          <p className="text-xs text-stone-500 mt-1">v1.0</p>
         </div>
         
         {[
@@ -877,31 +883,128 @@ export default function App() {
         {view === 'stats' && (
           <>
             <h2 className="text-xl lg:text-3xl font-bold text-stone-800 mb-4 lg:mb-6">Estadísticas</h2>
-            <div className="space-y-2 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-4 lg:space-y-0">
-              {stats.map(s => (
-                <div key={s.client.id} className="bg-white p-3 lg:p-6 rounded-xl shadow-sm">
-                  <div className="flex items-center gap-3 mb-3 pb-3 border-b">
-                    <div className="w-10 h-10 bg-amber-200 rounded-xl flex items-center justify-center font-bold text-sm">{s.client.nombre?.[0]}{s.client.apellido?.[0]}</div>
-                    <h3 className="font-semibold text-sm">{s.client.nombre} {s.client.apellido}</h3>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div>
-                      <div className="text-lg font-bold">{s.total}</div>
-                      <div className="text-xs text-stone-500">Sesiones</div>
-                    </div>
-                    <div>
-                      <div className="text-lg font-bold text-amber-600">{s.revenue}€</div>
-                      <div className="text-xs text-stone-500">Ingresos</div>
-                    </div>
-                    <div>
-                      <div className="text-lg font-bold">{s.avgDur}'</div>
-                      <div className="text-xs text-stone-500">Media</div>
-                    </div>
-                  </div>
+            {stats.length > 0 ? (
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-stone-50 border-b">
+                        <th className="text-left p-3 lg:p-4">
+                          <button
+                            onClick={() => {
+                              if (statsSortKey === 'nombre') {
+                                setStatsSortDir(statsSortDir === 'asc' ? 'desc' : 'asc');
+                              } else {
+                                setStatsSortKey('nombre');
+                                setStatsSortDir('asc');
+                              }
+                            }}
+                            className="flex items-center gap-1 font-medium text-sm text-stone-600 hover:text-stone-900"
+                          >
+                            Cliente
+                            {statsSortKey === 'nombre' ? (
+                              statsSortDir === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                            ) : (
+                              <ArrowUpDown size={14} className="text-stone-400" />
+                            )}
+                          </button>
+                        </th>
+                        <th className="text-right p-3 lg:p-4">
+                          <button
+                            onClick={() => {
+                              if (statsSortKey === 'total') {
+                                setStatsSortDir(statsSortDir === 'asc' ? 'desc' : 'asc');
+                              } else {
+                                setStatsSortKey('total');
+                                setStatsSortDir('desc');
+                              }
+                            }}
+                            className="flex items-center gap-1 font-medium text-sm text-stone-600 hover:text-stone-900 ml-auto"
+                          >
+                            Sesiones
+                            {statsSortKey === 'total' ? (
+                              statsSortDir === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                            ) : (
+                              <ArrowUpDown size={14} className="text-stone-400" />
+                            )}
+                          </button>
+                        </th>
+                        <th className="text-right p-3 lg:p-4">
+                          <button
+                            onClick={() => {
+                              if (statsSortKey === 'revenue') {
+                                setStatsSortDir(statsSortDir === 'asc' ? 'desc' : 'asc');
+                              } else {
+                                setStatsSortKey('revenue');
+                                setStatsSortDir('desc');
+                              }
+                            }}
+                            className="flex items-center gap-1 font-medium text-sm text-stone-600 hover:text-stone-900 ml-auto"
+                          >
+                            Ingresos
+                            {statsSortKey === 'revenue' ? (
+                              statsSortDir === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                            ) : (
+                              <ArrowUpDown size={14} className="text-stone-400" />
+                            )}
+                          </button>
+                        </th>
+                        <th className="text-right p-3 lg:p-4">
+                          <button
+                            onClick={() => {
+                              if (statsSortKey === 'avgDur') {
+                                setStatsSortDir(statsSortDir === 'asc' ? 'desc' : 'asc');
+                              } else {
+                                setStatsSortKey('avgDur');
+                                setStatsSortDir('desc');
+                              }
+                            }}
+                            className="flex items-center gap-1 font-medium text-sm text-stone-600 hover:text-stone-900 ml-auto"
+                          >
+                            <span className="hidden sm:inline">Media</span>
+                            <span className="sm:hidden">Med.</span>
+                            {statsSortKey === 'avgDur' ? (
+                              statsSortDir === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                            ) : (
+                              <ArrowUpDown size={14} className="text-stone-400" />
+                            )}
+                          </button>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...stats].sort((a, b) => {
+                        let cmp = 0;
+                        if (statsSortKey === 'nombre') {
+                          cmp = `${a.client.nombre} ${a.client.apellido}`.localeCompare(`${b.client.nombre} ${b.client.apellido}`);
+                        } else if (statsSortKey === 'total') {
+                          cmp = a.total - b.total;
+                        } else if (statsSortKey === 'revenue') {
+                          cmp = a.revenue - b.revenue;
+                        } else if (statsSortKey === 'avgDur') {
+                          cmp = a.avgDur - b.avgDur;
+                        }
+                        return statsSortDir === 'asc' ? cmp : -cmp;
+                      }).map(s => (
+                        <tr key={s.client.id} className="border-b last:border-b-0 hover:bg-stone-50">
+                          <td className="p-3 lg:p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-amber-200 rounded-lg flex items-center justify-center font-bold text-xs lg:text-sm flex-shrink-0">
+                                {s.client.nombre?.[0]}{s.client.apellido?.[0]}
+                              </div>
+                              <span className="font-medium text-sm truncate">{s.client.nombre} {s.client.apellido}</span>
+                            </div>
+                          </td>
+                          <td className="p-3 lg:p-4 text-right font-semibold">{s.total}</td>
+                          <td className="p-3 lg:p-4 text-right font-semibold text-amber-600">{s.revenue}€</td>
+                          <td className="p-3 lg:p-4 text-right font-semibold">{s.avgDur}'</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
-            </div>
-            {stats.length === 0 && (
+              </div>
+            ) : (
               <div className="text-center py-12 text-stone-400">
                 <BarChart3 size={48} className="mx-auto mb-4 opacity-50" />
                 <p>No hay estadísticas</p>
