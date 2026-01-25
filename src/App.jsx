@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Users, BarChart3, Plus, ChevronLeft, ChevronRight, Edit2, Trash2, X, Tag, Check, Phone, Repeat, Clock, AlertTriangle, CalendarOff, Loader, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle } from 'lucide-react';
+import { Calendar, Users, BarChart3, Plus, ChevronLeft, ChevronRight, Edit2, Trash2, X, Tag, Check, Phone, Repeat, Clock, AlertTriangle, CalendarOff, Loader, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, MessageSquare } from 'lucide-react';
 import { db, collection, doc, setDoc, onSnapshot, deleteDoc } from './firebase';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -124,6 +124,8 @@ export default function App() {
   const [statsSortKey, setStatsSortKey] = useState('nombre');
   const [statsSortDir, setStatsSortDir] = useState('asc');
   const [hoveredDay, setHoveredDay] = useState(null);
+  const [feedbacks, setFeedbacks] = useState([]);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   // Cargar datos de Firebase en tiempo real
   useEffect(() => {
@@ -168,6 +170,14 @@ export default function App() {
           setSchedule(snapshot.data());
         }
         setLoading(false);
+      })
+    );
+
+    // Feedbacks
+    unsubscribers.push(
+      onSnapshot(collection(db, 'feedbacks'), (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setFeedbacks(data);
       })
     );
 
@@ -382,11 +392,21 @@ export default function App() {
       <div className="fixed top-0 left-0 right-0 bg-stone-800 p-3 flex items-center justify-between z-30 lg:hidden">
         <div>
           <h1 className="text-lg font-bold text-amber-200">Patrick</h1>
-          <p className="text-xs text-stone-500">v1.5</p>
+          <p className="text-xs text-stone-500">v1.6</p>
         </div>
-        <button onClick={() => { setModal('appointment'); setEditItem(null); }} className="bg-amber-200 text-stone-800 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1">
-          <Plus size={16} /> Cita
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowFeedback(true)} className="bg-stone-700 text-stone-300 p-2 rounded-lg relative">
+            <MessageSquare size={16} />
+            {feedbacks.filter(f => !f.completed).length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                {feedbacks.filter(f => !f.completed).length}
+              </span>
+            )}
+          </button>
+          <button onClick={() => { setModal('appointment'); setEditItem(null); }} className="bg-amber-200 text-stone-800 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1">
+            <Plus size={16} /> Cita
+          </button>
+        </div>
       </div>
 
       {/* Mobile Bottom Navigation */}
@@ -413,12 +433,22 @@ export default function App() {
 
       {/* Desktop Sidebar */}
       <div className="hidden lg:flex w-56 bg-stone-800 p-6 flex-col gap-2 min-h-screen">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-amber-200">Patrick</h1>
-          <p className="text-xs text-stone-400 tracking-widest">MASAJES</p>
-          <p className="text-xs text-stone-500 mt-1">v1.5</p>
+        <div className="mb-8 flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-amber-200">Patrick</h1>
+            <p className="text-xs text-stone-400 tracking-widest">MASAJES</p>
+            <p className="text-xs text-stone-500 mt-1">v1.6</p>
+          </div>
+          <button onClick={() => setShowFeedback(true)} className="bg-stone-700 text-stone-300 p-2 rounded-lg relative hover:bg-stone-600">
+            <MessageSquare size={16} />
+            {feedbacks.filter(f => !f.completed).length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                {feedbacks.filter(f => !f.completed).length}
+              </span>
+            )}
+          </button>
         </div>
-        
+
         {[
           { id: 'calendar', icon: Calendar, label: 'Calendario' },
           { id: 'clients', icon: Users, label: 'Clientes' },
@@ -1253,6 +1283,13 @@ export default function App() {
         </Modal>
       )}
 
+      {showFeedback && (
+        <FeedbackPanel
+          feedbacks={feedbacks}
+          onClose={() => setShowFeedback(false)}
+        />
+      )}
+
       {confirmDel && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded-xl max-w-sm w-full">
@@ -1707,6 +1744,106 @@ function HolidayForm({ holiday, onSave, onCancel }) {
       <div className="flex gap-3 pt-4">
         <button onClick={onCancel} className="flex-1 py-3 border rounded-lg font-medium hover:bg-stone-50">Cancelar</button>
         <button onClick={handleSave} disabled={!name || !startDate} className="flex-1 py-3 bg-stone-800 text-amber-200 rounded-lg font-medium hover:bg-stone-700 disabled:opacity-50">{holiday ? 'Guardar' : 'Crear'}</button>
+      </div>
+    </div>
+  );
+}
+
+function FeedbackPanel({ feedbacks, onClose }) {
+  const [newMessage, setNewMessage] = useState('');
+
+  const handleSubmit = async () => {
+    if (!newMessage.trim()) return;
+    await setDoc(doc(db, 'feedbacks', generateId()), {
+      message: newMessage.trim(),
+      completed: false,
+      createdAt: new Date().toISOString()
+    });
+    setNewMessage('');
+  };
+
+  const toggleComplete = async (fb) => {
+    await setDoc(doc(db, 'feedbacks', fb.id), {
+      ...fb,
+      completed: !fb.completed,
+      completedAt: !fb.completed ? new Date().toISOString() : null
+    });
+  };
+
+  const deleteFeedback = async (id) => {
+    await deleteDoc(doc(db, 'feedbacks', id));
+  };
+
+  const sortedFeedbacks = [...feedbacks].sort((a, b) => {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex justify-between items-center p-4 border-b">
+          <h3 className="text-xl font-bold">Feedback / Tareas</h3>
+          <button onClick={onClose} className="p-2 hover:bg-stone-100 rounded-lg"><X size={20} /></button>
+        </div>
+
+        {/* Formulario */}
+        <div className="p-4 border-b bg-stone-50">
+          <div className="flex gap-2">
+            <input
+              value={newMessage}
+              onChange={e => setNewMessage(e.target.value)}
+              placeholder="Escribe una tarea o sugerencia..."
+              className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-amber-200 outline-none"
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+            />
+            <button
+              onClick={handleSubmit}
+              disabled={!newMessage.trim()}
+              className="px-4 py-2 bg-stone-800 text-amber-200 rounded-lg font-medium hover:bg-stone-700 disabled:opacity-50"
+            >
+              <Plus size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Lista */}
+        <div className="flex-1 overflow-auto p-4">
+          {sortedFeedbacks.length === 0 ? (
+            <div className="text-center py-12 text-stone-400">No hay tareas todavía</div>
+          ) : (
+            <div className="space-y-2">
+              {sortedFeedbacks.map(fb => (
+                <div
+                  key={fb.id}
+                  className={`flex items-start gap-3 p-3 rounded-lg border ${fb.completed ? 'bg-green-50 border-green-200' : 'bg-white border-stone-200'}`}
+                >
+                  <button
+                    onClick={() => toggleComplete(fb)}
+                    className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${fb.completed ? 'bg-green-500 border-green-500 text-white' : 'border-stone-300 hover:border-stone-400'}`}
+                  >
+                    {fb.completed && <Check size={12} />}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm ${fb.completed ? 'line-through text-stone-400' : 'text-stone-700'}`}>
+                      {fb.message}
+                    </p>
+                    <p className="text-xs text-stone-400 mt-1">
+                      {new Date(fb.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      {fb.completed && fb.completedAt && ` · Completado ${new Date(fb.completedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => deleteFeedback(fb.id)}
+                    className="text-stone-400 hover:text-red-500 p-1"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

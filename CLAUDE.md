@@ -18,9 +18,10 @@ App de gestión de citas para un negocio de masajes. React + Vite + Tailwind CSS
 
 ## Colecciones Firebase (Firestore)
 - `clients` - Clientes con campos: nombre, apellido, telefono, whatsappReminder (24h/48h/1week/null)
-- `appointments` - Citas con: clientId, dateTime, duration, specials[], recpiasurrenceId, recurrenceDuration
+- `appointments` - Citas con: clientId, dateTime, duration, specials[], recurrenceId, recurrenceDuration
 - `specials` - Tipos especiales (ubicaciones) con: name, color
 - `holidays` - Festivos personalizados
+- `feedbacks` - Tareas/feedback con: message, completed, createdAt, completedAt
 - `sent_reminders` - Registro de recordatorios WhatsApp enviados
 
 ## Vistas del Calendario (calView state)
@@ -41,6 +42,7 @@ App de gestión de citas para un negocio de masajes. React + Vite + Tailwind CSS
 - **WhatsApp reminders**: Por cliente, opciones 24h/48h/1week antes
 - **Estadísticas**: Tabla ordenable por cliente/sesiones/ingresos/media
 - **Festivos**: Predefinidos (Catalunya) + personalizados
+- **Feedback/Tareas**: Panel accesible desde header (icono MessageSquare), lista de tareas con checkbox
 
 ## Comandos Útiles
 ```bash
@@ -56,7 +58,7 @@ firebase functions:delete nombreFuncion
 ```
 
 ## Versión Actual
-v1.5
+v1.6
 
 ## Notas
 - El indicador de "hoy" en vistas usa `isSameDay()` para evitar problemas de timezone
