@@ -58,7 +58,7 @@ firebase functions:delete nombreFuncion
 ```
 
 ## Versión Actual
-v1.6
+v1.7
 
 ## Notas
 - El indicador de "hoy" en vistas usa `isSameDay()` para evitar problemas de timezone
