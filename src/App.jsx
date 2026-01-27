@@ -534,16 +534,76 @@ export default function App() {
                     Pasadas
                   </button>
                 </div>
+                <div className="px-3 py-2 border-b bg-stone-50" ref={dayFilterRef}>
+                  <div className="relative">
+                    <button
+                      onClick={() => { setDayFilterOpen(!dayFilterOpen); setDayFilterSearch(''); }}
+                      className={`flex items-center gap-2 text-sm border rounded-lg px-3 py-1.5 w-full transition-all ${dayFilterClient ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-stone-200 bg-white text-stone-600'} hover:border-stone-300`}
+                    >
+                      <Filter size={14} />
+                      <span className="flex-1 text-left truncate">
+                        {dayFilterClient ? `${clients.find(c => c.id === dayFilterClient)?.nombre || ''} ${clients.find(c => c.id === dayFilterClient)?.apellido || ''}`.trim() : 'Filtrar por cliente'}
+                      </span>
+                      {dayFilterClient && (
+                        <span onClick={(e) => { e.stopPropagation(); setDayFilterClient(''); setDayFilterOpen(false); }} className="ml-1 hover:text-red-500">
+                          <X size={14} />
+                        </span>
+                      )}
+                    </button>
+                    {dayFilterOpen && (
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-stone-200 rounded-lg shadow-lg z-50 overflow-hidden">
+                        <div className="p-2 border-b">
+                          <div className="flex items-center gap-2 bg-stone-50 rounded-md px-2 py-1.5">
+                            <Search size={14} className="text-stone-400" />
+                            <input
+                              type="text"
+                              value={dayFilterSearch}
+                              onChange={e => setDayFilterSearch(e.target.value)}
+                              placeholder="Buscar cliente..."
+                              className="bg-transparent text-sm outline-none w-full"
+                              autoFocus
+                            />
+                          </div>
+                        </div>
+                        <div className="max-h-48 overflow-y-auto">
+                          <button
+                            onClick={() => { setDayFilterClient(''); setDayFilterOpen(false); }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-stone-50 ${!dayFilterClient ? 'bg-amber-50 text-amber-800 font-medium' : ''}`}
+                          >
+                            Todos los clientes
+                          </button>
+                          {clients
+                            .slice()
+                            .sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''))
+                            .filter(c => {
+                              const name = `${c.nombre || ''} ${c.apellido || ''}`.toLowerCase();
+                              return name.includes(dayFilterSearch.toLowerCase());
+                            })
+                            .map(c => (
+                              <button
+                                key={c.id}
+                                onClick={() => { setDayFilterClient(c.id); setDayFilterOpen(false); }}
+                                className={`w-full text-left px-3 py-2 text-sm hover:bg-stone-50 ${dayFilterClient === c.id ? 'bg-amber-50 text-amber-800 font-medium' : ''}`}
+                              >
+                                {c.nombre} {c.apellido}
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
                 {(() => {
                   const now = new Date();
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);
                   
+                  const filtered = dayFilterClient ? appointments.filter(a => a.clientId === dayFilterClient) : appointments;
                   const apts = showCompleted
-                    ? appointments
+                    ? filtered
                         .filter(a => new Date(a.dateTime) < today)
                         .sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime))
-                    : appointments
+                    : filtered
                         .filter(a => new Date(a.dateTime) >= today)
                         .sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
                   
@@ -706,65 +766,8 @@ export default function App() {
 
             {calView === 'day' && (
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-4 bg-stone-50 border-b flex items-center justify-between gap-3">
+                <div className="p-4 bg-stone-50 border-b">
                   <h3 className="font-semibold">{currentDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</h3>
-                  <div className="relative" ref={dayFilterRef}>
-                    <button
-                      onClick={() => { setDayFilterOpen(!dayFilterOpen); setDayFilterSearch(''); }}
-                      className={`flex items-center gap-2 text-sm border rounded-lg px-3 py-1.5 transition-all ${dayFilterClient ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-stone-200 bg-white text-stone-600'} hover:border-stone-300`}
-                    >
-                      <Filter size={14} />
-                      <span className="max-w-[150px] truncate">
-                        {dayFilterClient ? `${clients.find(c => c.id === dayFilterClient)?.nombre || ''} ${clients.find(c => c.id === dayFilterClient)?.apellido || ''}`.trim() : 'Filtrar cliente'}
-                      </span>
-                      {dayFilterClient && (
-                        <span onClick={(e) => { e.stopPropagation(); setDayFilterClient(''); setDayFilterOpen(false); }} className="ml-1 hover:text-red-500">
-                          <X size={14} />
-                        </span>
-                      )}
-                    </button>
-                    {dayFilterOpen && (
-                      <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-stone-200 rounded-lg shadow-lg z-50 overflow-hidden">
-                        <div className="p-2 border-b">
-                          <div className="flex items-center gap-2 bg-stone-50 rounded-md px-2 py-1.5">
-                            <Search size={14} className="text-stone-400" />
-                            <input
-                              type="text"
-                              value={dayFilterSearch}
-                              onChange={e => setDayFilterSearch(e.target.value)}
-                              placeholder="Buscar cliente..."
-                              className="bg-transparent text-sm outline-none w-full"
-                              autoFocus
-                            />
-                          </div>
-                        </div>
-                        <div className="max-h-48 overflow-y-auto">
-                          <button
-                            onClick={() => { setDayFilterClient(''); setDayFilterOpen(false); }}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-stone-50 ${!dayFilterClient ? 'bg-amber-50 text-amber-800 font-medium' : ''}`}
-                          >
-                            Todos los clientes
-                          </button>
-                          {clients
-                            .slice()
-                            .sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''))
-                            .filter(c => {
-                              const name = `${c.nombre || ''} ${c.apellido || ''}`.toLowerCase();
-                              return name.includes(dayFilterSearch.toLowerCase());
-                            })
-                            .map(c => (
-                              <button
-                                key={c.id}
-                                onClick={() => { setDayFilterClient(c.id); setDayFilterOpen(false); }}
-                                className={`w-full text-left px-3 py-2 text-sm hover:bg-stone-50 ${dayFilterClient === c.id ? 'bg-amber-50 text-amber-800 font-medium' : ''}`}
-                              >
-                                {c.nombre} {c.apellido}
-                              </button>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
                 </div>
                 <div className="flex">
                   <div className="w-16 lg:w-20 flex-shrink-0">
@@ -794,7 +797,6 @@ export default function App() {
                     {(() => {
                       const dayApts = appointments
                         .filter(a => isSameDay(new Date(a.dateTime), currentDate))
-                        .filter(a => !dayFilterClient || a.clientId === dayFilterClient)
                         .map(apt => {
                           const start = new Date(apt.dateTime);
                           const end = new Date(start.getTime() + apt.duration * 60000);
