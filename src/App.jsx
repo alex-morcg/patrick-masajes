@@ -675,38 +675,85 @@ export default function App() {
                       );
                     })}
                   </div>
-                  {HOURS.map(hour => (
-                    <div key={hour} className="grid grid-cols-8 border-b last:border-b-0">
-                      <div className="p-2 text-right text-sm text-stone-400 bg-stone-50 border-r">{hour}:00</div>
-                      {getWeekDays(currentDate).map((d, i) => {
-                        const daySchedule = schedule[d.getDay()];
-                        const isWorkingHour = daySchedule && (() => {
-                          const [startH] = daySchedule.start.split(':').map(Number);
-                          const [endH] = daySchedule.end.split(':').map(Number);
-                          return hour >= startH && hour < endH;
-                        })();
-                        const isPastDay = d < new Date(new Date().setHours(0,0,0,0));
-                        const holiday = isHoliday(d);
-                        
-                        return (
-                          <div key={i} className={`p-1 min-h-16 border-r last:border-r-0 ${isPastDay ? 'bg-stone-200' : holiday ? 'bg-red-50' : !isWorkingHour ? 'bg-stone-100' : ''}`}>
-                            {getAptsForHour(d, hour).map(apt => {
-                              const c = getClient(apt.clientId);
-                              const aptSpecial = specials.find(s => apt.specials?.includes(s.id));
-                              const bgColor = aptSpecial?.color || 'bg-amber-200';
-                              return (
-                                <button key={apt.id} onClick={() => { setModal('appointment'); setEditItem(apt); }} className={`w-full text-left p-2 rounded-lg text-xs font-medium mb-1 ${isPastDay ? 'bg-stone-300 text-stone-500' : bgColor}`}>
-                                  {c?.nombre}
-                                  <span className="block text-xs opacity-70">{apt.duration}min</span>
-                                  {apt.seriesId && <Repeat size={10} className="inline ml-1" />}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        );
-                      })}
+                  <div className="grid grid-cols-8">
+                    {/* Hour labels column */}
+                    <div className="bg-stone-50 border-r">
+                      {HOURS.map(hour => (
+                        <div key={hour} className="h-16 p-2 text-right text-sm text-stone-400 border-b">{hour}:00</div>
+                      ))}
                     </div>
-                  ))}
+                    {/* Day columns with absolute positioned appointments */}
+                    {getWeekDays(currentDate).map((d, i) => {
+                      const isPastDay = d < new Date(new Date().setHours(0,0,0,0));
+                      const holiday = isHoliday(d);
+                      const firstHour = HOURS[0];
+                      const pxPerHour = 64;
+
+                      const dayApts = appointments
+                        .filter(a => isSameDay(new Date(a.dateTime), d))
+                        .map(apt => {
+                          const start = new Date(apt.dateTime);
+                          const end = new Date(start.getTime() + apt.duration * 60000);
+                          return { ...apt, start, end };
+                        });
+
+                      const getOverlapInfo = (apt) => {
+                        const overlapping = dayApts.filter(a =>
+                          a.id !== apt.id && apt.start < a.end && apt.end > a.start
+                        );
+                        if (overlapping.length === 0) return { total: 1, index: 0 };
+                        const group = [apt, ...overlapping].sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+                        const index = group.findIndex(a => a.id === apt.id);
+                        return { total: group.length, index };
+                      };
+
+                      return (
+                        <div key={i} className="relative border-r last:border-r-0">
+                          {HOURS.map(hour => {
+                            const daySchedule = schedule[d.getDay()];
+                            const isWorkingHour = daySchedule && (() => {
+                              const [startH] = daySchedule.start.split(':').map(Number);
+                              const [endH] = daySchedule.end.split(':').map(Number);
+                              return hour >= startH && hour < endH;
+                            })();
+                            return (
+                              <div key={hour} className={`h-16 border-b ${isPastDay ? 'bg-stone-200' : holiday ? 'bg-red-50' : !isWorkingHour ? 'bg-stone-100' : ''}`}></div>
+                            );
+                          })}
+                          {dayApts.map(apt => {
+                            const c = getClient(apt.clientId);
+                            const aptSpecial = specials.find(s => apt.specials?.includes(s.id));
+                            const bgColor = aptSpecial?.color || 'bg-amber-200';
+                            const startMinutes = (apt.start.getHours() - firstHour) * 60 + apt.start.getMinutes();
+                            const topPx = (startMinutes / 60) * pxPerHour;
+                            const heightPx = Math.max((apt.duration / 60) * pxPerHour, 18);
+                            const { total, index } = getOverlapInfo(apt);
+                            const widthPercent = 100 / total;
+                            const leftPercent = index * widthPercent;
+
+                            return (
+                              <button
+                                key={apt.id}
+                                onClick={() => { setModal('appointment'); setEditItem(apt); }}
+                                className={`absolute ${isPastDay ? 'bg-stone-300 text-stone-500' : bgColor} rounded-md px-1 py-0.5 text-left hover:opacity-80 transition-all overflow-hidden z-10`}
+                                style={{
+                                  top: `${topPx}px`,
+                                  height: `${heightPx}px`,
+                                  left: `calc(${leftPercent}% + 2px)`,
+                                  width: `calc(${widthPercent}% - 4px)`
+                                }}
+                              >
+                                <div className="font-semibold text-xs truncate">{c?.nombre}</div>
+                                <div className="text-xs opacity-70 truncate">
+                                  {formatTime(apt.dateTime)} · {apt.duration}min
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}
