@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Users, BarChart3, Plus, ChevronLeft, ChevronRight, Edit2, Trash2, X, Tag, Check, Phone, Repeat, Clock, AlertTriangle, CalendarOff, Loader, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, MessageSquare } from 'lucide-react';
+import { Calendar, Users, BarChart3, Plus, ChevronLeft, ChevronRight, Edit2, Trash2, X, Tag, Check, Phone, Repeat, Clock, AlertTriangle, CalendarOff, Loader, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, MessageSquare, Filter } from 'lucide-react';
 import { db, collection, doc, setDoc, onSnapshot, deleteDoc } from './firebase';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -126,6 +126,7 @@ export default function App() {
   const [hoveredDay, setHoveredDay] = useState(null);
   const [feedbacks, setFeedbacks] = useState([]);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [dayFilterClient, setDayFilterClient] = useState('');
 
   // Cargar datos de Firebase en tiempo real
   useEffect(() => {
@@ -692,8 +693,24 @@ export default function App() {
 
             {calView === 'day' && (
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-4 bg-stone-50 border-b">
+                <div className="p-4 bg-stone-50 border-b flex items-center justify-between gap-3">
                   <h3 className="font-semibold">{currentDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</h3>
+                  <div className="flex items-center gap-2">
+                    <Filter size={16} className="text-stone-400" />
+                    <select
+                      value={dayFilterClient}
+                      onChange={e => setDayFilterClient(e.target.value)}
+                      className="text-sm border border-stone-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-amber-300"
+                    >
+                      <option value="">Todos los clientes</option>
+                      {clients
+                        .slice()
+                        .sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''))
+                        .map(c => (
+                          <option key={c.id} value={c.id}>{c.nombre} {c.apellido}</option>
+                        ))}
+                    </select>
+                  </div>
                 </div>
                 <div className="flex">
                   <div className="w-16 lg:w-20 flex-shrink-0">
@@ -723,6 +740,7 @@ export default function App() {
                     {(() => {
                       const dayApts = appointments
                         .filter(a => isSameDay(new Date(a.dateTime), currentDate))
+                        .filter(a => !dayFilterClient || a.clientId === dayFilterClient)
                         .map(apt => {
                           const start = new Date(apt.dateTime);
                           const end = new Date(start.getTime() + apt.duration * 60000);
