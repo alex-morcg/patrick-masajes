@@ -325,7 +325,10 @@ export default function App() {
     const clientName = client ? `${client.nombre} ${client.apellido}` : 'Desconocido';
     const dateStr = new Date(data.dateTime).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
-    if (editItem && !editItem.prefillDate) {
+    // Determinar si es edición: editItem existe, tiene id, y no es prefill de doble-click
+    const isEditMode = editItem && editItem.id && !editItem.prefillDate;
+
+    if (isEditMode) {
       if (editFuture && editItem.seriesId) {
         const originalDate = new Date(editItem.dateTime);
         const newDate = new Date(data.dateTime);
@@ -345,7 +348,7 @@ export default function App() {
         await setDoc(doc(db, 'appointments', editItem.id), aptData);
         await addLog('edit_appointment', `${clientName} - ${dateStr}`);
       }
-    } else {
+    } else if (!isEditMode) {
       const { skipDates = [], recurrenceDuration, ...aptData } = data;
       const seriesId = aptData.recurrence ? generateId() : null;
       const base = new Date(aptData.dateTime);
