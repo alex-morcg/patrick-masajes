@@ -863,18 +863,27 @@ export default function App() {
 
                         {/* Tooltip on hover */}
                         {hoveredDay === dateStr && apts.length > 0 && (
-                          <div className="absolute z-50 left-0 top-full mt-1 bg-white border rounded-lg shadow-lg p-2 min-w-[160px]" onClick={e => e.stopPropagation()}>
+                          <div
+                            className="absolute z-50 bg-white border rounded-lg shadow-lg p-2 min-w-[180px] max-w-[250px]"
+                            style={{
+                              left: i % 7 >= 5 ? 'auto' : 0,
+                              right: i % 7 >= 5 ? 0 : 'auto',
+                              top: '100%',
+                              marginTop: '4px'
+                            }}
+                            onClick={e => e.stopPropagation()}
+                          >
                             <div className="text-xs font-semibold mb-2 text-stone-700">
                               {obj.date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
                             </div>
-                            <div className="space-y-1">
+                            <div className="space-y-1 max-h-[200px] overflow-auto">
                               {apts.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime)).map(apt => {
                                 const c = getClient(apt.clientId);
                                 const aptSpecial = specials.find(s => apt.specials?.includes(s.id));
                                 const bgColor = aptSpecial?.color || 'bg-amber-100';
                                 return (
                                   <div key={apt.id} className={`text-xs flex items-center gap-1 px-2 py-1 rounded ${bgColor}`}>
-                                    <span className="font-medium">{formatTime(apt.dateTime)}</span>
+                                    <span className="font-medium whitespace-nowrap">{formatTime(apt.dateTime)}</span>
                                     <span className="truncate">{c?.nombre} {c?.apellido}</span>
                                   </div>
                                 );
