@@ -556,28 +556,31 @@ export default function App() {
               </button>
             </div>
 
-            {/* Mobile: Vista selector simplificada */}
-            <div className="flex items-center justify-between bg-white p-2 rounded-xl shadow-sm mb-4 lg:mb-6 lg:p-4">
-              <button onClick={() => navigate(-1)} className="p-2 hover:bg-stone-100 rounded-lg"><ChevronLeft size={20} /></button>
-              <div className="flex-1 text-center">
-                <h3 className="text-sm lg:text-lg font-semibold">
-                  {calView === 'list' && 'Próximas citas'}
-                  {calView === 'day' && formatDate(currentDate)}
-                  {calView === 'week' && `${formatDate(getWeekDays(currentDate)[0])} - ${formatDate(getWeekDays(currentDate)[6])}`}
-                  {calView === 'month' && currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
-                  {calView === 'year' && currentDate.getFullYear()}
-                </h3>
+            {/* Sticky navigation bar */}
+            <div className="sticky top-14 lg:top-0 z-30 bg-stone-100 -mx-3 px-3 lg:-mx-8 lg:px-8 pb-4 pt-2 lg:pt-0">
+              {/* Mobile: Vista selector simplificada */}
+              <div className="flex items-center justify-between bg-white p-2 rounded-xl shadow-sm mb-4 lg:mb-4 lg:p-4">
+                <button onClick={() => navigate(-1)} className="p-2 hover:bg-stone-100 rounded-lg"><ChevronLeft size={20} /></button>
+                <div className="flex-1 text-center">
+                  <h3 className="text-sm lg:text-lg font-semibold">
+                    {calView === 'list' && 'Próximas citas'}
+                    {calView === 'day' && formatDate(currentDate)}
+                    {calView === 'week' && `${formatDate(getWeekDays(currentDate)[0])} - ${formatDate(getWeekDays(currentDate)[6])}`}
+                    {calView === 'month' && currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                    {calView === 'year' && currentDate.getFullYear()}
+                  </h3>
+                </div>
+                <button onClick={() => navigate(1)} className="p-2 hover:bg-stone-100 rounded-lg"><ChevronRight size={20} /></button>
               </div>
-              <button onClick={() => navigate(1)} className="p-2 hover:bg-stone-100 rounded-lg"><ChevronRight size={20} /></button>
-            </div>
 
-            {/* Vista tabs */}
-            <div className="flex gap-1 bg-stone-100 p-1 rounded-lg mb-4 lg:mb-6">
-              {['list', 'day', 'week', 'month', 'year'].map(v => (
-                <button key={v} onClick={() => setCalView(v)} className={`flex-1 py-2 rounded-md text-xs lg:text-sm font-medium transition-all ${calView === v ? 'bg-white shadow-sm' : 'hover:bg-stone-200'}`}>
-                  {v === 'list' ? 'Lista' : v === 'day' ? 'Día' : v === 'week' ? 'Sem' : v === 'month' ? 'Mes' : 'Año'}
-                </button>
-              ))}
+              {/* Vista tabs */}
+              <div className="flex gap-1 bg-white p-1 rounded-lg shadow-sm">
+                {['list', 'day', 'week', 'month', 'year'].map(v => (
+                  <button key={v} onClick={() => setCalView(v)} className={`flex-1 py-2 rounded-md text-xs lg:text-sm font-medium transition-all ${calView === v ? 'bg-stone-100 shadow-sm' : 'hover:bg-stone-50'}`}>
+                    {v === 'list' ? 'Lista' : v === 'day' ? 'Día' : v === 'week' ? 'Sem' : v === 'month' ? 'Mes' : 'Año'}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {calView === 'list' && (
@@ -720,24 +723,37 @@ export default function App() {
               </div>
             )}
 
-            {calView === 'week' && (
+            {calView === 'week' && (() => {
+              const weekDays = getWeekDays(currentDate);
+              const gridCols = weekDays.map(d => schedule[d.getDay()] ? '1fr' : '24px').join('_');
+              const gridStyle = { gridTemplateColumns: `50px ${weekDays.map(d => schedule[d.getDay()] ? '1fr' : '24px').join(' ')}` };
+              return (
               <div className="bg-white rounded-xl shadow-sm overflow-auto max-h-[calc(100vh-200px)] lg:max-h-none">
-                <div className="min-w-[800px]">
-                  <div className="grid grid-cols-[50px_repeat(7,1fr)] border-b sticky top-0 z-20">
+                <div className="min-w-[600px]">
+                  <div className="grid border-b sticky top-0 z-20" style={gridStyle}>
                     <div className="p-3 bg-stone-50"></div>
-                    {getWeekDays(currentDate).map((d, i) => {
+                    {weekDays.map((d, i) => {
                       const isPastDay = d < new Date(new Date().setHours(0,0,0,0));
                       const holiday = isHoliday(d);
+                      const hasSchedule = schedule[d.getDay()];
                       return (
-                        <div key={i} className={`p-3 text-center ${isSameDay(d, new Date()) ? 'bg-amber-200' : isPastDay ? 'bg-stone-200 text-stone-400' : holiday ? 'bg-red-100' : 'bg-stone-50'}`}>
-                          <div className="text-xs text-stone-500 uppercase">{d.toLocaleDateString('es-ES', { weekday: 'short' })}</div>
-                          <div className={`font-semibold ${holiday && !isPastDay ? 'text-red-600' : ''}`}>{d.getDate()}</div>
-                          {holiday && !isPastDay && <div className="text-xs text-red-500 truncate">{holiday.name}</div>}
+                        <div key={i} className={`p-1 ${hasSchedule ? 'p-3' : ''} text-center ${isSameDay(d, new Date()) ? 'bg-amber-200' : isPastDay ? 'bg-stone-200 text-stone-400' : holiday ? 'bg-red-100' : 'bg-stone-50'}`}>
+                          {hasSchedule ? (
+                            <>
+                              <div className="text-xs text-stone-500 uppercase">{d.toLocaleDateString('es-ES', { weekday: 'short' })}</div>
+                              <div className={`font-semibold ${holiday && !isPastDay ? 'text-red-600' : ''}`}>{d.getDate()}</div>
+                              {holiday && !isPastDay && <div className="text-xs text-red-500 truncate">{holiday.name}</div>}
+                            </>
+                          ) : (
+                            <div className="text-xs text-stone-400 writing-mode-vertical" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
+                              {d.toLocaleDateString('es-ES', { weekday: 'short' })}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                   </div>
-                  <div className="grid grid-cols-[50px_repeat(7,1fr)]">
+                  <div className="grid" style={gridStyle}>
                     {/* Hour labels column - sticky */}
                     <div className="bg-stone-50 border-r sticky left-0 z-20">
                       {HOURS.map(hour => (
@@ -745,11 +761,23 @@ export default function App() {
                       ))}
                     </div>
                     {/* Day columns with absolute positioned appointments */}
-                    {getWeekDays(currentDate).map((d, i) => {
+                    {weekDays.map((d, i) => {
                       const isPastDay = d < new Date(new Date().setHours(0,0,0,0));
                       const holiday = isHoliday(d);
+                      const hasSchedule = schedule[d.getDay()];
                       const firstHour = HOURS[0];
                       const pxPerHour = 64;
+
+                      // For days without schedule, show simple narrow column
+                      if (!hasSchedule) {
+                        return (
+                          <div key={i} className="relative border-r last:border-r-0 bg-stone-100">
+                            {HOURS.map(hour => (
+                              <div key={hour} className="h-16 border-b bg-stone-100"></div>
+                            ))}
+                          </div>
+                        );
+                      }
 
                       const dayApts = appointments
                         .filter(a => isSameDay(new Date(a.dateTime), d))
@@ -827,7 +855,7 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            )}
+            );})()}
 
             {calView === 'month' && (
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
