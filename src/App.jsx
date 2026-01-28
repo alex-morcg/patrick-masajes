@@ -545,7 +545,7 @@ export default function App() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto p-3 pt-16 lg:p-8 lg:pt-8">
+      <div className="flex-1 p-3 pt-16 lg:p-8 lg:pt-8 lg:overflow-auto">
         {/* CALENDAR */}
         {view === 'calendar' && (
           <>
@@ -556,8 +556,8 @@ export default function App() {
               </button>
             </div>
 
-            {/* Sticky navigation bar */}
-            <div className="sticky top-0 z-30 bg-stone-100 -mx-3 px-3 lg:-mx-8 lg:px-8 pb-4 pt-1">
+            {/* Sticky navigation bar - fixed on mobile, sticky on desktop */}
+            <div className="fixed top-14 left-0 right-0 lg:sticky lg:top-0 z-20 bg-stone-100 px-3 lg:-mx-8 lg:px-8 pb-3 pt-1">
               {/* Mobile: Vista selector simplificada */}
               <div className="flex items-center justify-between bg-white p-2 rounded-xl shadow-sm mb-4 lg:mb-4 lg:p-4">
                 <button onClick={() => navigate(-1)} className="p-2 hover:bg-stone-100 rounded-lg"><ChevronLeft size={20} /></button>
@@ -582,6 +582,8 @@ export default function App() {
                 ))}
               </div>
             </div>
+            {/* Spacer for fixed nav on mobile */}
+            <div className="h-28 lg:h-0"></div>
 
             {calView === 'list' && (
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
