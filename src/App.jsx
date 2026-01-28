@@ -1687,7 +1687,7 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, o
   };
 
   const getRecurringConflicts = () => {
-    if (apt || !recurrence) return [];
+    if (isEditing || !recurrence) return [];
 
     const baseDate = new Date(`${date}T${time}`);
     const iterations = getIterations();
@@ -1857,18 +1857,18 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, o
           <input type="number" value={cost} onChange={e => setCost(e.target.value)} placeholder="Opcional" className="w-full p-3 border rounded-lg" />
         </div>
       </div>
-      {!apt && (
+      {!isEditing && (
         <div>
           <label className="block text-sm font-medium text-stone-600 mb-1">Repetición</label>
           <div className={recurrence ? 'grid grid-cols-2 gap-2' : ''}>
-            <select value={recurrence} onChange={e => setRecurrence(e.target.value)} className="w-full p-3 border rounded-lg">
+            <select value={recurrence} onChange={e => { setRecurrence(e.target.value); setSkipConflictDates([]); }} className="w-full p-3 border rounded-lg">
               <option value="">Sin repetición</option>
               <option value="weekly">Semanal</option>
               <option value="biweekly">Cada 2 semanas</option>
               <option value="monthly">Mensual</option>
             </select>
             {recurrence && (
-              <select value={recurrenceDuration} onChange={e => setRecurrenceDuration(e.target.value)} className="w-full p-3 border rounded-lg">
+              <select value={recurrenceDuration} onChange={e => { setRecurrenceDuration(e.target.value); setSkipConflictDates([]); }} className="w-full p-3 border rounded-lg">
                 <option value="2">2 meses</option>
                 <option value="6">6 meses</option>
                 <option value="12">1 año</option>
