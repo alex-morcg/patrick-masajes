@@ -465,7 +465,7 @@ export default function App() {
       <div className="fixed top-0 left-0 right-0 bg-stone-800 p-3 flex items-center justify-between z-30 lg:hidden">
         <div>
           <h1 className="text-lg font-bold text-amber-200">Patrick</h1>
-          <p className="text-xs text-stone-500">v2.0</p>
+          <p className="text-xs text-stone-500">v2.0 {currentUser && `· ${currentUser.name}`}</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowSettings(true)} className="bg-stone-700 text-stone-300 p-2 rounded-lg relative">
@@ -510,7 +510,7 @@ export default function App() {
           <div>
             <h1 className="text-2xl font-bold text-amber-200">Patrick</h1>
             <p className="text-xs text-stone-400 tracking-widest">MASAJES</p>
-            <p className="text-xs text-stone-500 mt-1">v2.0</p>
+            <p className="text-xs text-stone-500 mt-1">v2.0 {currentUser && `· ${currentUser.name}`}</p>
           </div>
           <button onClick={() => setShowSettings(true)} className="bg-stone-700 text-stone-300 p-2 rounded-lg relative hover:bg-stone-600">
             <Settings size={16} />
