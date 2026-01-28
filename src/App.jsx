@@ -557,7 +557,7 @@ export default function App() {
             </div>
 
             {/* Sticky navigation bar */}
-            <div className="sticky top-14 lg:top-0 z-30 bg-stone-100 -mx-3 px-3 lg:-mx-8 lg:px-8 pb-4 pt-2 lg:pt-0">
+            <div className="sticky top-0 z-30 bg-stone-100 -mx-3 px-3 lg:-mx-8 lg:px-8 pb-4 pt-1">
               {/* Mobile: Vista selector simplificada */}
               <div className="flex items-center justify-between bg-white p-2 rounded-xl shadow-sm mb-4 lg:mb-4 lg:p-4">
                 <button onClick={() => navigate(-1)} className="p-2 hover:bg-stone-100 rounded-lg"><ChevronLeft size={20} /></button>
@@ -730,14 +730,15 @@ export default function App() {
               return (
               <div className="bg-white rounded-xl shadow-sm overflow-auto max-h-[calc(100vh-200px)] lg:max-h-none">
                 <div className="min-w-[600px]">
-                  <div className="grid border-b sticky top-0 z-20" style={gridStyle}>
+                  <div className="grid border-b sticky top-0 z-30 bg-stone-50" style={gridStyle}>
                     <div className="p-3 bg-stone-50"></div>
                     {weekDays.map((d, i) => {
                       const isPastDay = d < new Date(new Date().setHours(0,0,0,0));
                       const holiday = isHoliday(d);
                       const hasSchedule = schedule[d.getDay()];
+                      const bgClass = isSameDay(d, new Date()) ? 'bg-amber-200' : isPastDay ? 'bg-stone-200 text-stone-400' : holiday ? 'bg-red-100' : 'bg-stone-50';
                       return (
-                        <div key={i} className={`p-1 ${hasSchedule ? 'p-3' : ''} text-center ${isSameDay(d, new Date()) ? 'bg-amber-200' : isPastDay ? 'bg-stone-200 text-stone-400' : holiday ? 'bg-red-100' : 'bg-stone-50'}`}>
+                        <div key={i} className={`p-1 ${hasSchedule ? 'p-3' : ''} text-center ${bgClass}`}>
                           {hasSchedule ? (
                             <>
                               <div className="text-xs text-stone-500 uppercase">{d.toLocaleDateString('es-ES', { weekday: 'short' })}</div>
