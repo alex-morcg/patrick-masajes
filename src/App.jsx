@@ -406,7 +406,7 @@ export default function App() {
       <div className="fixed top-0 left-0 right-0 bg-stone-800 p-3 flex items-center justify-between z-30 lg:hidden">
         <div>
           <h1 className="text-lg font-bold text-amber-200">Patrick</h1>
-          <p className="text-xs text-stone-500">v1.7</p>
+          <p className="text-xs text-stone-500">v1.8</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowFeedback(true)} className="bg-stone-700 text-stone-300 p-2 rounded-lg relative">
@@ -451,7 +451,7 @@ export default function App() {
           <div>
             <h1 className="text-2xl font-bold text-amber-200">Patrick</h1>
             <p className="text-xs text-stone-400 tracking-widest">MASAJES</p>
-            <p className="text-xs text-stone-500 mt-1">v1.7</p>
+            <p className="text-xs text-stone-500 mt-1">v1.8</p>
           </div>
           <button onClick={() => setShowFeedback(true)} className="bg-stone-700 text-stone-300 p-2 rounded-lg relative hover:bg-stone-600">
             <MessageSquare size={16} />
@@ -659,9 +659,9 @@ export default function App() {
             )}
 
             {calView === 'week' && (
-              <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
+              <div className="bg-white rounded-xl shadow-sm overflow-auto max-h-[calc(100vh-200px)] lg:max-h-none">
                 <div className="min-w-[800px]">
-                  <div className="grid grid-cols-8 border-b">
+                  <div className="grid grid-cols-[50px_repeat(7,1fr)] border-b sticky top-0 z-20">
                     <div className="p-3 bg-stone-50"></div>
                     {getWeekDays(currentDate).map((d, i) => {
                       const isPastDay = d < new Date(new Date().setHours(0,0,0,0));
@@ -675,11 +675,11 @@ export default function App() {
                       );
                     })}
                   </div>
-                  <div className="grid grid-cols-8">
-                    {/* Hour labels column */}
-                    <div className="bg-stone-50 border-r">
+                  <div className="grid grid-cols-[50px_repeat(7,1fr)]">
+                    {/* Hour labels column - sticky */}
+                    <div className="bg-stone-50 border-r sticky left-0 z-10">
                       {HOURS.map(hour => (
-                        <div key={hour} className="h-16 p-2 text-right text-sm text-stone-400 border-b">{hour}:00</div>
+                        <div key={hour} className="h-16 p-1 text-right text-xs text-stone-400 border-b bg-stone-50">{hour}:00</div>
                       ))}
                     </div>
                     {/* Day columns with absolute positioned appointments */}
@@ -717,7 +717,16 @@ export default function App() {
                               return hour >= startH && hour < endH;
                             })();
                             return (
-                              <div key={hour} className={`h-16 border-b ${isPastDay ? 'bg-stone-200' : holiday ? 'bg-red-50' : !isWorkingHour ? 'bg-stone-100' : ''}`}></div>
+                              <div
+                                key={hour}
+                                className={`h-16 border-b cursor-pointer ${isPastDay ? 'bg-stone-200' : holiday ? 'bg-red-50' : !isWorkingHour ? 'bg-stone-100' : 'hover:bg-amber-50'}`}
+                                onDoubleClick={() => {
+                                  const newDate = new Date(d);
+                                  newDate.setHours(hour, 0, 0, 0);
+                                  setEditItem({ prefillDate: newDate });
+                                  setModal('appointment');
+                                }}
+                              ></div>
                             );
                           })}
                           {dayApts.map(apt => {
@@ -775,6 +784,13 @@ export default function App() {
                       <div
                         key={i}
                         onClick={() => { setCurrentDate(obj.date); setCalView('day'); }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          const newDate = new Date(obj.date);
+                          newDate.setHours(10, 0, 0, 0);
+                          setEditItem({ prefillDate: newDate });
+                          setModal('appointment');
+                        }}
                         onMouseEnter={() => apts.length > 0 && setHoveredDay(dateStr)}
                         onMouseLeave={() => setHoveredDay(null)}
                         className={`p-1 lg:p-2 min-h-16 lg:min-h-24 border-b border-r cursor-pointer hover:bg-amber-50 relative ${!obj.isCurrentMonth ? 'bg-stone-50 opacity-50' : isPastDay ? 'bg-stone-100' : holiday ? 'bg-red-50' : ''} ${isSameDay(obj.date, new Date()) ? 'bg-amber-100' : ''}`}
@@ -833,7 +849,19 @@ export default function App() {
                       })();
                       
                       return (
-                        <div key={hour} className={`h-20 border-b relative ${!isWorkingHour ? 'bg-stone-100' : ''}`}>
+                        <div
+                          key={hour}
+                          className={`h-20 border-b relative cursor-pointer ${!isWorkingHour ? 'bg-stone-100' : 'hover:bg-amber-50'}`}
+                          onDoubleClick={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const clickY = e.clientY - rect.top;
+                            const minutes = Math.floor((clickY / rect.height) * 60 / 15) * 15;
+                            const newDate = new Date(currentDate);
+                            newDate.setHours(hour, minutes, 0, 0);
+                            setEditItem({ prefillDate: newDate });
+                            setModal('appointment');
+                          }}
+                        >
                           <div className="absolute w-full h-px bg-stone-100" style={{ top: '25%' }}></div>
                           <div className="absolute w-full h-px bg-stone-200" style={{ top: '50%' }}></div>
                           <div className="absolute w-full h-px bg-stone-100" style={{ top: '75%' }}></div>
@@ -1005,6 +1033,13 @@ export default function App() {
                                     onMouseEnter={() => aptCount > 0 && setHoveredDay(dateStr)}
                                     onMouseLeave={() => setHoveredDay(null)}
                                     onClick={() => { setCurrentDate(date); setCalView('day'); }}
+                                    onDoubleClick={(e) => {
+                                      e.stopPropagation();
+                                      const newDate = new Date(date);
+                                      newDate.setHours(10, 0, 0, 0);
+                                      setEditItem({ prefillDate: newDate });
+                                      setModal('appointment');
+                                    }}
                                   >
                                     <div className={`text-xs font-medium ${textClass} ${isToday ? 'bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center' : ''}`}>
                                       {date.getDate()}
@@ -1486,19 +1521,30 @@ function ClientForm({ client, onSave, onCancel }) {
 }
 
 function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, editFuture, setEditFuture, appointments, checkConflicts }) {
-  const [clientId, setClientId] = useState(apt?.clientId || '');
+  const prefillDate = apt?.prefillDate ? new Date(apt.prefillDate) : null;
+  const isEditing = apt && !apt.prefillDate;
+
+  const [clientId, setClientId] = useState(isEditing ? apt.clientId : '');
   const [clientSearch, setClientSearch] = useState('');
   const [showClientList, setShowClientList] = useState(false);
-  const [date, setDate] = useState(apt ? new Date(apt.dateTime).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
-  const [time, setTime] = useState(apt ? `${String(new Date(apt.dateTime).getHours()).padStart(2,'0')}:${String(new Date(apt.dateTime).getMinutes()).padStart(2,'0')}` : '10:00');
-  const [duration, setDuration] = useState(apt?.duration || 60);
-  const [cost, setCost] = useState(apt?.cost?.toString() || '');
-  const [selSpecials, setSelSpecials] = useState(apt?.specials || []);
-  const [recurrence, setRecurrence] = useState(apt?.recurrence || '');
+  const [date, setDate] = useState(() => {
+    if (prefillDate) return prefillDate.toISOString().split('T')[0];
+    if (isEditing) return new Date(apt.dateTime).toISOString().split('T')[0];
+    return new Date().toISOString().split('T')[0];
+  });
+  const [time, setTime] = useState(() => {
+    if (prefillDate) return `${String(prefillDate.getHours()).padStart(2,'0')}:${String(prefillDate.getMinutes()).padStart(2,'0')}`;
+    if (isEditing) return `${String(new Date(apt.dateTime).getHours()).padStart(2,'0')}:${String(new Date(apt.dateTime).getMinutes()).padStart(2,'0')}`;
+    return '10:00';
+  });
+  const [duration, setDuration] = useState(isEditing ? apt.duration : 60);
+  const [cost, setCost] = useState(isEditing ? apt.cost?.toString() || '' : '');
+  const [selSpecials, setSelSpecials] = useState(isEditing ? apt.specials || [] : []);
+  const [recurrence, setRecurrence] = useState(isEditing ? apt.recurrence || '' : '');
   const [recurrenceDuration, setRecurrenceDuration] = useState('6'); // meses: 2, 6, 12
   const [skipConflictDates, setSkipConflictDates] = useState([]);
 
-  const isPast = apt && new Date(apt.dateTime) < new Date();
+  const isPast = isEditing && new Date(apt.dateTime) < new Date();
   const toggleSpecial = (id) => setSelSpecials(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
 
   const selectedClient = clients.find(c => c.id === clientId);
@@ -1523,7 +1569,7 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, e
     dateTime: new Date(`${date}T${time}`).toISOString(),
     duration: Number(duration)
   };
-  const conflicts = (date && time && duration) ? checkConflicts(currentAptData, apt?.id) : [];
+  const conflicts = (date && time && duration) ? checkConflicts(currentAptData, isEditing ? apt.id : null) : [];
 
   const getIterations = () => {
     const months = Number(recurrenceDuration);
@@ -1580,7 +1626,7 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, e
       specials: selSpecials,
       recurrence: apt ? apt.recurrence : (recurrence || null),
       recurrenceDuration: apt ? apt.recurrenceDuration : (recurrence ? Number(recurrenceDuration) : null),
-      seriesId: apt?.seriesId,
+      seriesId: isEditing ? apt.seriesId : undefined,
       skipDates: skipConflictDates
     };
 
@@ -1589,7 +1635,7 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, e
 
   return (
     <div className="space-y-4">
-      {apt?.seriesId && !isPast && (
+      {isEditing && apt.seriesId && !isPast && (
         <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
           <p className="text-sm mb-2">Cita recurrente:</p>
           <label className="flex items-center gap-2 text-sm"><input type="radio" checked={!editFuture} onChange={() => setEditFuture(false)} />Solo esta</label>
@@ -1732,19 +1778,19 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, e
         </div>
       </div>
       <div className="flex gap-3 pt-4">
-        {apt && !isPast && (
+        {isEditing && !isPast && (
           <button onClick={() => onDelete(apt, editFuture)} className="flex items-center gap-2 px-3 py-2 border border-red-200 text-red-500 rounded-lg hover:bg-red-50 text-sm">
             <Trash2 size={16} />
             {editFuture && apt.seriesId ? 'Eliminar futuras' : 'Eliminar'}
           </button>
         )}
         <button onClick={onCancel} className="flex-1 py-3 border rounded-lg font-medium hover:bg-stone-50">Cancelar</button>
-        <button 
+        <button
           onClick={handleSave}
           disabled={!clientId}
           className="flex-1 py-3 bg-stone-800 text-amber-200 rounded-lg font-medium hover:bg-stone-700 disabled:opacity-50"
         >
-          {apt ? 'Guardar' : 'Crear'}
+          {isEditing ? 'Guardar' : 'Crear'}
         </button>
       </div>
     </div>
