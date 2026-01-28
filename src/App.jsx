@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Users, BarChart3, Plus, ChevronLeft, ChevronRight, Edit2, Trash2, X, Tag, Check, Phone, Repeat, Clock, AlertTriangle, CalendarOff, Loader, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, MessageSquare, Filter, Search } from 'lucide-react';
+import { Calendar, Users, BarChart3, Plus, ChevronLeft, ChevronRight, Edit2, Trash2, X, Tag, Check, Phone, Repeat, Clock, AlertTriangle, CalendarOff, Loader, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, MessageSquare, Filter, Search, Settings, History, UserPlus } from 'lucide-react';
 import { db, collection, doc, setDoc, onSnapshot, deleteDoc } from './firebase';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -125,7 +125,11 @@ export default function App() {
   const [statsSortDir, setStatsSortDir] = useState('asc');
   const [hoveredDay, setHoveredDay] = useState(null);
   const [feedbacks, setFeedbacks] = useState([]);
-  const [showFeedback, setShowFeedback] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('feedback');
+  const [users, setUsers] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [dayFilterClient, setDayFilterClient] = useState('');
   const [dayFilterSearch, setDayFilterSearch] = useState('');
   const [dayFilterOpen, setDayFilterOpen] = useState(false);
@@ -195,12 +199,48 @@ export default function App() {
       })
     );
 
+    // Usuarios
+    unsubscribers.push(
+      onSnapshot(collection(db, 'users'), (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setUsers(data);
+      })
+    );
+
+    // Logs
+    unsubscribers.push(
+      onSnapshot(collection(db, 'logs'), (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setLogs(data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)));
+      })
+    );
+
     return () => unsubscribers.forEach(unsub => unsub());
   }, []);
+
+  // Detectar usuario por URL
+  useEffect(() => {
+    const path = window.location.pathname;
+    const username = path.split('/').filter(Boolean)[0];
+    if (username && users.length > 0) {
+      const user = users.find(u => u.slug === username.toLowerCase());
+      if (user) setCurrentUser(user);
+    }
+  }, [users]);
 
   const getClient = (id) => clients.find(c => c.id === id);
   const getAptsForDate = (date) => appointments.filter(a => isSameDay(new Date(a.dateTime), date));
   const getAptsForHour = (date, hour) => appointments.filter(a => { const d = new Date(a.dateTime); return isSameDay(d, date) && d.getHours() === hour; });
+
+  const addLog = async (action, details) => {
+    await setDoc(doc(db, 'logs', generateId()), {
+      action,
+      details,
+      userId: currentUser?.id || null,
+      userName: currentUser?.name || 'Anónimo',
+      timestamp: new Date().toISOString()
+    });
+  };
 
   const isHoliday = (date) => {
     const dateStr = date.toISOString().split('T')[0];
@@ -261,39 +301,49 @@ export default function App() {
   // CRUD Operations with Firebase
   const saveClient = async (data) => {
     const id = editItem?.id || generateId();
+    const isNew = !editItem?.id;
     await setDoc(doc(db, 'clients', id), data);
+    await addLog(isNew ? 'create_client' : 'edit_client', `${data.nombre} ${data.apellido}`);
     setModal(null);
     setEditItem(null);
   };
 
   const deleteClient = async (id) => {
+    const client = clients.find(c => c.id === id);
     await deleteDoc(doc(db, 'clients', id));
     // También eliminar sus citas
     const clientApts = appointments.filter(a => a.clientId === id);
     for (const apt of clientApts) {
       await deleteDoc(doc(db, 'appointments', apt.id));
     }
+    await addLog('delete_client', `${client?.nombre} ${client?.apellido}`);
     setConfirmDel(null);
   };
 
   const saveAppointment = async (data) => {
-    if (editItem) {
+    const client = clients.find(c => c.id === data.clientId);
+    const clientName = client ? `${client.nombre} ${client.apellido}` : 'Desconocido';
+    const dateStr = new Date(data.dateTime).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+    if (editItem && !editItem.prefillDate) {
       if (editFuture && editItem.seriesId) {
         const originalDate = new Date(editItem.dateTime);
         const newDate = new Date(data.dateTime);
         const timeDiff = newDate.getTime() - originalDate.getTime();
-        
+
         const editFromDate = new Date(editItem.dateTime);
         const toUpdate = appointments.filter(a => a.seriesId === editItem.seriesId && new Date(a.dateTime) >= editFromDate);
-        
+
         for (const apt of toUpdate) {
           const aptDate = new Date(apt.dateTime);
           aptDate.setTime(aptDate.getTime() + timeDiff);
           await setDoc(doc(db, 'appointments', apt.id), { ...apt, ...data, dateTime: aptDate.toISOString() });
         }
+        await addLog('edit_appointment', `${clientName} (${toUpdate.length} citas recurrentes)`);
       } else {
         const { skipDates, ...aptData } = data;
         await setDoc(doc(db, 'appointments', editItem.id), aptData);
+        await addLog('edit_appointment', `${clientName} - ${dateStr}`);
       }
     } else {
       const { skipDates = [], recurrenceDuration, ...aptData } = data;
@@ -307,18 +357,21 @@ export default function App() {
       else if (aptData.recurrence === 'biweekly') iterations = Math.round(months * 2.17);
       else if (aptData.recurrence === 'monthly') iterations = months;
 
+      let created = 0;
       for (let i = 0; i < iterations; i++) {
         const d = new Date(base);
         if (aptData.recurrence === 'weekly') d.setDate(d.getDate() + i * 7);
         if (aptData.recurrence === 'biweekly') d.setDate(d.getDate() + i * 14);
         if (aptData.recurrence === 'monthly') d.setMonth(d.getMonth() + i);
 
-        const dateStr = d.toISOString().split('T')[0];
-        if (!skipDates.includes(dateStr)) {
+        const dStr = d.toISOString().split('T')[0];
+        if (!skipDates.includes(dStr)) {
           const id = generateId();
           await setDoc(doc(db, 'appointments', id), { ...aptData, dateTime: d.toISOString(), seriesId });
+          created++;
         }
       }
+      await addLog('create_appointment', `${clientName} - ${dateStr}${created > 1 ? ` (${created} citas)` : ''}`);
     }
     setModal(null);
     setEditItem(null);
@@ -326,14 +379,20 @@ export default function App() {
   };
 
   const deleteAppointment = async (apt, delFuture) => {
+    const client = clients.find(c => c.id === apt.clientId);
+    const clientName = client ? `${client.nombre} ${client.apellido}` : 'Desconocido';
+    const dateStr = new Date(apt.dateTime).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
     if (delFuture && apt.seriesId) {
       const now = new Date();
       const toDelete = appointments.filter(a => a.seriesId === apt.seriesId && new Date(a.dateTime) >= now);
       for (const a of toDelete) {
         await deleteDoc(doc(db, 'appointments', a.id));
       }
+      await addLog('delete_appointment', `${clientName} (${toDelete.length} citas recurrentes)`);
     } else {
       await deleteDoc(doc(db, 'appointments', apt.id));
+      await addLog('delete_appointment', `${clientName} - ${dateStr}`);
     }
     setConfirmDel(null);
     setModal(null);
@@ -406,11 +465,11 @@ export default function App() {
       <div className="fixed top-0 left-0 right-0 bg-stone-800 p-3 flex items-center justify-between z-30 lg:hidden">
         <div>
           <h1 className="text-lg font-bold text-amber-200">Patrick</h1>
-          <p className="text-xs text-stone-500">v1.8</p>
+          <p className="text-xs text-stone-500">v1.9</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowFeedback(true)} className="bg-stone-700 text-stone-300 p-2 rounded-lg relative">
-            <MessageSquare size={16} />
+          <button onClick={() => setShowSettings(true)} className="bg-stone-700 text-stone-300 p-2 rounded-lg relative">
+            <Settings size={16} />
             {feedbacks.filter(f => !f.completed).length > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
                 {feedbacks.filter(f => !f.completed).length}
@@ -451,10 +510,10 @@ export default function App() {
           <div>
             <h1 className="text-2xl font-bold text-amber-200">Patrick</h1>
             <p className="text-xs text-stone-400 tracking-widest">MASAJES</p>
-            <p className="text-xs text-stone-500 mt-1">v1.8</p>
+            <p className="text-xs text-stone-500 mt-1">v1.9</p>
           </div>
-          <button onClick={() => setShowFeedback(true)} className="bg-stone-700 text-stone-300 p-2 rounded-lg relative hover:bg-stone-600">
-            <MessageSquare size={16} />
+          <button onClick={() => setShowSettings(true)} className="bg-stone-700 text-stone-300 p-2 rounded-lg relative hover:bg-stone-600">
+            <Settings size={16} />
             {feedbacks.filter(f => !f.completed).length > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
                 {feedbacks.filter(f => !f.completed).length}
@@ -677,7 +736,7 @@ export default function App() {
                   </div>
                   <div className="grid grid-cols-[50px_repeat(7,1fr)]">
                     {/* Hour labels column - sticky */}
-                    <div className="bg-stone-50 border-r sticky left-0 z-10">
+                    <div className="bg-stone-50 border-r sticky left-0 z-20">
                       {HOURS.map(hour => (
                         <div key={hour} className="h-16 p-1 text-right text-xs text-stone-400 border-b bg-stone-50">{hour}:00</div>
                       ))}
@@ -1439,10 +1498,16 @@ export default function App() {
         </Modal>
       )}
 
-      {showFeedback && (
-        <FeedbackPanel
+      {showSettings && (
+        <SettingsPanel
           feedbacks={feedbacks}
-          onClose={() => setShowFeedback(false)}
+          users={users}
+          logs={logs}
+          clients={clients}
+          currentUser={currentUser}
+          settingsTab={settingsTab}
+          setSettingsTab={setSettingsTab}
+          onClose={() => setShowSettings(false)}
         />
       )}
 
@@ -1616,7 +1681,7 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, e
   };
 
   const handleSave = () => {
-    if (!clientId) return;
+    if (!clientId || !date || !time) return;
 
     const data = {
       clientId,
@@ -1624,8 +1689,8 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, e
       duration: Number(duration),
       cost: cost ? Number(cost) : null,
       specials: selSpecials,
-      recurrence: apt ? apt.recurrence : (recurrence || null),
-      recurrenceDuration: apt ? apt.recurrenceDuration : (recurrence ? Number(recurrenceDuration) : null),
+      recurrence: isEditing ? apt.recurrence : (recurrence || null),
+      recurrenceDuration: isEditing ? apt.recurrenceDuration : (recurrence ? Number(recurrenceDuration) : null),
       seriesId: isEditing ? apt.seriesId : undefined,
       skipDates: skipConflictDates
     };
@@ -1778,20 +1843,27 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, e
         </div>
       </div>
       <div className="flex gap-3 pt-4">
-        {isEditing && !isPast && (
+        {isEditing && (
           <button onClick={() => onDelete(apt, editFuture)} className="flex items-center gap-2 px-3 py-2 border border-red-200 text-red-500 rounded-lg hover:bg-red-50 text-sm">
             <Trash2 size={16} />
             {editFuture && apt.seriesId ? 'Eliminar futuras' : 'Eliminar'}
           </button>
         )}
         <button onClick={onCancel} className="flex-1 py-3 border rounded-lg font-medium hover:bg-stone-50">Cancelar</button>
-        <button
-          onClick={handleSave}
-          disabled={!clientId}
-          className="flex-1 py-3 bg-stone-800 text-amber-200 rounded-lg font-medium hover:bg-stone-700 disabled:opacity-50"
-        >
-          {isEditing ? 'Guardar' : 'Crear'}
-        </button>
+        <div className="flex-1 relative group">
+          <button
+            onClick={handleSave}
+            disabled={!clientId || !date || !time}
+            className="w-full py-3 bg-stone-800 text-amber-200 rounded-lg font-medium hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isEditing ? 'Guardar' : 'Crear'}
+          </button>
+          {(!clientId || !date || !time) && (
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-stone-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+              {!clientId ? 'Selecciona un cliente' : !date ? 'Selecciona fecha' : 'Selecciona hora'}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1916,10 +1988,12 @@ function HolidayForm({ holiday, onSave, onCancel }) {
   );
 }
 
-function FeedbackPanel({ feedbacks, onClose }) {
+function SettingsPanel({ feedbacks, users, logs, clients, currentUser, settingsTab, setSettingsTab, onClose }) {
   const [newMessage, setNewMessage] = useState('');
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserSlug, setNewUserSlug] = useState('');
 
-  const handleSubmit = async () => {
+  const handleSubmitFeedback = async () => {
     if (!newMessage.trim()) return;
     await setDoc(doc(db, 'feedbacks', generateId()), {
       message: newMessage.trim(),
@@ -1941,76 +2015,226 @@ function FeedbackPanel({ feedbacks, onClose }) {
     await deleteDoc(doc(db, 'feedbacks', id));
   };
 
+  const handleAddUser = async () => {
+    if (!newUserName.trim() || !newUserSlug.trim()) return;
+    await setDoc(doc(db, 'users', generateId()), {
+      name: newUserName.trim(),
+      slug: newUserSlug.trim().toLowerCase(),
+      createdAt: new Date().toISOString()
+    });
+    setNewUserName('');
+    setNewUserSlug('');
+  };
+
+  const deleteUser = async (id) => {
+    await deleteDoc(doc(db, 'users', id));
+  };
+
   const sortedFeedbacks = [...feedbacks].sort((a, b) => {
     if (a.completed !== b.completed) return a.completed ? 1 : -1;
     return new Date(b.createdAt) - new Date(a.createdAt);
   });
 
+  const getActionLabel = (action) => {
+    const labels = {
+      'create_client': 'Nuevo cliente',
+      'edit_client': 'Editó cliente',
+      'delete_client': 'Eliminó cliente',
+      'create_appointment': 'Nueva cita',
+      'edit_appointment': 'Editó cita',
+      'delete_appointment': 'Eliminó cita'
+    };
+    return labels[action] || action;
+  };
+
+  const getActionColor = (action) => {
+    if (action.includes('create')) return 'bg-green-100 text-green-700';
+    if (action.includes('edit')) return 'bg-blue-100 text-blue-700';
+    if (action.includes('delete')) return 'bg-red-100 text-red-700';
+    return 'bg-stone-100 text-stone-700';
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-white rounded-xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center p-4 border-b">
-          <h3 className="text-xl font-bold">Feedback / Tareas</h3>
+          <h3 className="text-xl font-bold">Configuración</h3>
           <button onClick={onClose} className="p-2 hover:bg-stone-100 rounded-lg"><X size={20} /></button>
         </div>
 
-        {/* Formulario */}
-        <div className="p-4 border-b bg-stone-50">
-          <div className="flex gap-2">
-            <input
-              value={newMessage}
-              onChange={e => setNewMessage(e.target.value)}
-              placeholder="Escribe una tarea o sugerencia..."
-              className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-amber-200 outline-none"
-              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-            />
-            <button
-              onClick={handleSubmit}
-              disabled={!newMessage.trim()}
-              className="px-4 py-2 bg-stone-800 text-amber-200 rounded-lg font-medium hover:bg-stone-700 disabled:opacity-50"
-            >
-              <Plus size={20} />
-            </button>
-          </div>
+        {/* Tabs */}
+        <div className="flex border-b">
+          <button
+            onClick={() => setSettingsTab('feedback')}
+            className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${settingsTab === 'feedback' ? 'border-b-2 border-amber-500 text-amber-700' : 'text-stone-500'}`}
+          >
+            <MessageSquare size={16} />
+            Tareas
+            {feedbacks.filter(f => !f.completed).length > 0 && (
+              <span className="bg-red-500 text-white text-xs px-1.5 rounded-full">{feedbacks.filter(f => !f.completed).length}</span>
+            )}
+          </button>
+          <button
+            onClick={() => setSettingsTab('users')}
+            className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${settingsTab === 'users' ? 'border-b-2 border-amber-500 text-amber-700' : 'text-stone-500'}`}
+          >
+            <UserPlus size={16} />
+            Usuarios
+          </button>
+          <button
+            onClick={() => setSettingsTab('logs')}
+            className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${settingsTab === 'logs' ? 'border-b-2 border-amber-500 text-amber-700' : 'text-stone-500'}`}
+          >
+            <History size={16} />
+            Historial
+          </button>
         </div>
 
-        {/* Lista */}
-        <div className="flex-1 overflow-auto p-4">
-          {sortedFeedbacks.length === 0 ? (
-            <div className="text-center py-12 text-stone-400">No hay tareas todavía</div>
-          ) : (
-            <div className="space-y-2">
-              {sortedFeedbacks.map(fb => (
-                <div
-                  key={fb.id}
-                  className={`flex items-start gap-3 p-3 rounded-lg border ${fb.completed ? 'bg-green-50 border-green-200' : 'bg-white border-stone-200'}`}
+        {/* Feedback Tab */}
+        {settingsTab === 'feedback' && (
+          <>
+            <div className="p-4 border-b bg-stone-50">
+              <div className="flex gap-2">
+                <input
+                  value={newMessage}
+                  onChange={e => setNewMessage(e.target.value)}
+                  placeholder="Escribe una tarea o sugerencia..."
+                  className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-amber-200 outline-none"
+                  onKeyDown={e => e.key === 'Enter' && handleSubmitFeedback()}
+                />
+                <button
+                  onClick={handleSubmitFeedback}
+                  disabled={!newMessage.trim()}
+                  className="px-4 py-2 bg-stone-800 text-amber-200 rounded-lg font-medium hover:bg-stone-700 disabled:opacity-50"
                 >
-                  <button
-                    onClick={() => toggleComplete(fb)}
-                    className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${fb.completed ? 'bg-green-500 border-green-500 text-white' : 'border-stone-300 hover:border-stone-400'}`}
-                  >
-                    {fb.completed && <Check size={12} />}
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm ${fb.completed ? 'line-through text-stone-400' : 'text-stone-700'}`}>
-                      {fb.message}
-                    </p>
-                    <p className="text-xs text-stone-400 mt-1">
-                      {new Date(fb.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                      {fb.completed && fb.completedAt && ` · Completado ${new Date(fb.completedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => deleteFeedback(fb.id)}
-                    className="text-stone-400 hover:text-red-500 p-1"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
+                  <Plus size={20} />
+                </button>
+              </div>
             </div>
-          )}
-        </div>
+            <div className="flex-1 overflow-auto p-4">
+              {sortedFeedbacks.length === 0 ? (
+                <div className="text-center py-12 text-stone-400">No hay tareas todavía</div>
+              ) : (
+                <div className="space-y-2">
+                  {sortedFeedbacks.map(fb => (
+                    <div
+                      key={fb.id}
+                      className={`flex items-start gap-3 p-3 rounded-lg border ${fb.completed ? 'bg-green-50 border-green-200' : 'bg-white border-stone-200'}`}
+                    >
+                      <button
+                        onClick={() => toggleComplete(fb)}
+                        className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${fb.completed ? 'bg-green-500 border-green-500 text-white' : 'border-stone-300 hover:border-stone-400'}`}
+                      >
+                        {fb.completed && <Check size={12} />}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm ${fb.completed ? 'line-through text-stone-400' : 'text-stone-700'}`}>
+                          {fb.message}
+                        </p>
+                        <p className="text-xs text-stone-400 mt-1">
+                          {new Date(fb.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          {fb.completed && fb.completedAt && ` · Completado ${new Date(fb.completedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => deleteFeedback(fb.id)}
+                        className="text-stone-400 hover:text-red-500 p-1"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Users Tab */}
+        {settingsTab === 'users' && (
+          <>
+            <div className="p-4 border-b bg-stone-50">
+              <div className="flex gap-2">
+                <input
+                  value={newUserName}
+                  onChange={e => setNewUserName(e.target.value)}
+                  placeholder="Nombre"
+                  className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-amber-200 outline-none"
+                />
+                <input
+                  value={newUserSlug}
+                  onChange={e => setNewUserSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
+                  placeholder="URL (ej: patrick)"
+                  className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-amber-200 outline-none"
+                />
+                <button
+                  onClick={handleAddUser}
+                  disabled={!newUserName.trim() || !newUserSlug.trim()}
+                  className="px-4 py-2 bg-stone-800 text-amber-200 rounded-lg font-medium hover:bg-stone-700 disabled:opacity-50"
+                >
+                  <Plus size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto p-4">
+              {currentUser && (
+                <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                  <p className="text-sm text-amber-700">
+                    Conectado como: <strong>{currentUser.name}</strong>
+                  </p>
+                </div>
+              )}
+              {users.length === 0 ? (
+                <div className="text-center py-12 text-stone-400">No hay usuarios todavía</div>
+              ) : (
+                <div className="space-y-2">
+                  {users.map(user => (
+                    <div key={user.id} className="flex items-center gap-3 p-3 rounded-lg border bg-white">
+                      <div className="w-8 h-8 bg-stone-200 rounded-full flex items-center justify-center font-bold text-sm">
+                        {user.name?.[0]?.toUpperCase()}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{user.name}</p>
+                        <p className="text-xs text-stone-400">/{user.slug}</p>
+                      </div>
+                      <button
+                        onClick={() => deleteUser(user.id)}
+                        className="text-stone-400 hover:text-red-500 p-1"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Logs Tab */}
+        {settingsTab === 'logs' && (
+          <div className="flex-1 overflow-auto p-4">
+            {logs.length === 0 ? (
+              <div className="text-center py-12 text-stone-400">No hay historial todavía</div>
+            ) : (
+              <div className="space-y-2">
+                {logs.slice(0, 100).map(log => (
+                  <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg border bg-white">
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${getActionColor(log.action)}`}>
+                      {getActionLabel(log.action)}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-stone-700 truncate">{log.details}</p>
+                      <p className="text-xs text-stone-400">
+                        {log.userName} · {new Date(log.timestamp).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
