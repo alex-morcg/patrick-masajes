@@ -465,7 +465,7 @@ export default function App() {
       <div className="fixed top-0 left-0 right-0 bg-stone-800 p-3 flex items-center justify-between z-30 lg:hidden">
         <div>
           <h1 className="text-lg font-bold text-amber-200">Patrick</h1>
-          <p className="text-xs text-stone-500">v1.9</p>
+          <p className="text-xs text-stone-500">v2.0</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowSettings(true)} className="bg-stone-700 text-stone-300 p-2 rounded-lg relative">
@@ -510,7 +510,7 @@ export default function App() {
           <div>
             <h1 className="text-2xl font-bold text-amber-200">Patrick</h1>
             <p className="text-xs text-stone-400 tracking-widest">MASAJES</p>
-            <p className="text-xs text-stone-500 mt-1">v1.9</p>
+            <p className="text-xs text-stone-500 mt-1">v2.0</p>
           </div>
           <button onClick={() => setShowSettings(true)} className="bg-stone-700 text-stone-300 p-2 rounded-lg relative hover:bg-stone-600">
             <Settings size={16} />
@@ -1469,17 +1469,18 @@ export default function App() {
 
       {modal === 'appointment' && (
         <Modal title={editItem ? 'Editar Cita' : 'Nueva Cita'} onClose={() => { setModal(null); setEditItem(null); setEditFuture(false); }}>
-          <AppointmentForm 
-            apt={editItem} 
-            clients={clients} 
+          <AppointmentForm
+            apt={editItem}
+            clients={clients}
             specials={specials}
             appointments={appointments}
             checkConflicts={checkConflicts}
             holidays={holidays}
             isHoliday={isHoliday}
-            onSave={saveAppointment} 
+            onSave={saveAppointment}
             onDelete={(apt, future) => setConfirmDel({ type: 'appointment', item: apt, future })}
             onCancel={() => { setModal(null); setEditItem(null); setEditFuture(false); }}
+            onCreateClient={() => { setModal('client'); setEditItem(null); }}
             editFuture={editFuture}
             setEditFuture={setEditFuture}
           />
@@ -1585,7 +1586,7 @@ function ClientForm({ client, onSave, onCancel }) {
   );
 }
 
-function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, editFuture, setEditFuture, appointments, checkConflicts }) {
+function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, onCreateClient, editFuture, setEditFuture, appointments, checkConflicts }) {
   const prefillDate = apt?.prefillDate ? new Date(apt.prefillDate) : null;
   const isEditing = apt && !apt.prefillDate;
 
@@ -1765,6 +1766,14 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, e
             />
             {showClientList && (
               <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-auto">
+                <button
+                  type="button"
+                  onClick={onCreateClient}
+                  className="w-full text-left p-3 hover:bg-green-50 flex items-center gap-2 border-b text-green-600 font-medium"
+                >
+                  <UserPlus size={16} />
+                  Crear nuevo cliente
+                </button>
                 {filteredClients.length === 0 ? (
                   <div className="p-3 text-stone-400 text-sm">No se encontraron clientes</div>
                 ) : (
