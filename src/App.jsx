@@ -118,6 +118,7 @@ export default function App() {
   
   const [modal, setModal] = useState(null);
   const [editItem, setEditItem] = useState(null);
+  const [pendingAppointment, setPendingAppointment] = useState(null);
   const [confirmDel, setConfirmDel] = useState(null);
   const [editFuture, setEditFuture] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
@@ -304,8 +305,16 @@ export default function App() {
     const isNew = !editItem?.id;
     await setDoc(doc(db, 'clients', id), data);
     await addLog(isNew ? 'create_client' : 'edit_client', `${data.nombre} ${data.apellido}`);
-    setModal(null);
-    setEditItem(null);
+
+    // Si hay una cita pendiente, volver al formulario de cita con el nuevo cliente seleccionado
+    if (pendingAppointment && isNew) {
+      setEditItem({ ...pendingAppointment, newClientId: id });
+      setModal('appointment');
+      setPendingAppointment(null);
+    } else {
+      setModal(null);
+      setEditItem(null);
+    }
   };
 
   const deleteClient = async (id) => {
@@ -1526,7 +1535,7 @@ export default function App() {
             onSave={saveAppointment}
             onDelete={(apt, future) => setConfirmDel({ type: 'appointment', item: apt, future })}
             onCancel={() => { setModal(null); setEditItem(null); setEditFuture(false); }}
-            onCreateClient={() => { setModal('client'); setEditItem(null); }}
+            onCreateClient={(aptData) => { setPendingAppointment(aptData); setModal('client'); setEditItem(null); }}
             editFuture={editFuture}
             setEditFuture={setEditFuture}
           />
@@ -1634,26 +1643,52 @@ function ClientForm({ client, onSave, onCancel }) {
 
 function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, onCreateClient, editFuture, setEditFuture, appointments, checkConflicts }) {
   const prefillDate = apt?.prefillDate ? new Date(apt.prefillDate) : null;
-  const isEditing = apt && !apt.prefillDate;
+  const isEditing = apt && !apt.prefillDate && !apt.newClientId;
+  const isReturningFromClientCreate = apt?.newClientId;
 
-  const [clientId, setClientId] = useState(isEditing ? apt.clientId : '');
+  const [clientId, setClientId] = useState(() => {
+    if (isReturningFromClientCreate) return apt.newClientId;
+    if (isEditing) return apt.clientId;
+    return '';
+  });
   const [clientSearch, setClientSearch] = useState('');
   const [showClientList, setShowClientList] = useState(false);
   const [date, setDate] = useState(() => {
+    if (isReturningFromClientCreate && apt.date) return apt.date;
     if (prefillDate) return prefillDate.toISOString().split('T')[0];
     if (isEditing) return new Date(apt.dateTime).toISOString().split('T')[0];
     return new Date().toISOString().split('T')[0];
   });
   const [time, setTime] = useState(() => {
+    if (isReturningFromClientCreate && apt.time) return apt.time;
     if (prefillDate) return `${String(prefillDate.getHours()).padStart(2,'0')}:${String(prefillDate.getMinutes()).padStart(2,'0')}`;
     if (isEditing) return `${String(new Date(apt.dateTime).getHours()).padStart(2,'0')}:${String(new Date(apt.dateTime).getMinutes()).padStart(2,'0')}`;
     return '10:00';
   });
-  const [duration, setDuration] = useState(isEditing ? apt.duration : 60);
-  const [cost, setCost] = useState(isEditing ? apt.cost?.toString() || '' : '');
-  const [selSpecials, setSelSpecials] = useState(isEditing ? apt.specials || [] : []);
-  const [recurrence, setRecurrence] = useState(isEditing ? apt.recurrence || '' : '');
-  const [recurrenceDuration, setRecurrenceDuration] = useState('6'); // meses: 2, 6, 12
+  const [duration, setDuration] = useState(() => {
+    if (isReturningFromClientCreate && apt.duration) return apt.duration;
+    if (isEditing) return apt.duration;
+    return 60;
+  });
+  const [cost, setCost] = useState(() => {
+    if (isReturningFromClientCreate && apt.cost) return apt.cost;
+    if (isEditing) return apt.cost?.toString() || '';
+    return '';
+  });
+  const [selSpecials, setSelSpecials] = useState(() => {
+    if (isReturningFromClientCreate && apt.specials) return apt.specials;
+    if (isEditing) return apt.specials || [];
+    return [];
+  });
+  const [recurrence, setRecurrence] = useState(() => {
+    if (isReturningFromClientCreate && apt.recurrence) return apt.recurrence;
+    if (isEditing) return apt.recurrence || '';
+    return '';
+  });
+  const [recurrenceDuration, setRecurrenceDuration] = useState(() => {
+    if (isReturningFromClientCreate && apt.recurrenceDuration) return apt.recurrenceDuration;
+    return '6';
+  });
   const [skipConflictDates, setSkipConflictDates] = useState([]);
 
   const isPast = isEditing && new Date(apt.dateTime) < new Date();
@@ -1817,7 +1852,7 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, o
               <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-auto">
                 <button
                   type="button"
-                  onClick={onCreateClient}
+                  onClick={() => onCreateClient({ date, time, duration, cost, specials: selSpecials, recurrence, recurrenceDuration })}
                   className="w-full text-left p-3 hover:bg-green-50 flex items-center gap-2 border-b text-green-600 font-medium"
                 >
                   <UserPlus size={16} />
