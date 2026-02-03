@@ -1677,11 +1677,14 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, o
     setShowClientList(false);
   };
 
-  const currentAptData = {
-    dateTime: new Date(`${date}T${time}`).toISOString(),
+  const dateTimeObj = (date && time) ? new Date(`${date}T${time}`) : null;
+  const isValidDateTime = dateTimeObj && !isNaN(dateTimeObj.getTime());
+  const currentAptData = isValidDateTime ? {
+    dateTime: dateTimeObj.toISOString(),
     duration: Number(duration)
-  };
-  const conflicts = (date && time && duration) ? checkConflicts(currentAptData, isEditing ? apt.id : null) : [];
+  } : null;
+  const conflicts = (currentAptData && duration) ? checkConflicts(currentAptData, isEditing ? apt.id : null) : [];
+  const canSave = clientId && date && time && duration && Number(duration) > 0 && isValidDateTime;
 
   const getIterations = () => {
     const months = Number(recurrenceDuration);
@@ -1728,11 +1731,11 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, o
   };
 
   const handleSave = () => {
-    if (!clientId || !date || !time) return;
+    if (!canSave) return;
 
     const data = {
       clientId,
-      dateTime: new Date(`${date}T${time}`).toISOString(),
+      dateTime: dateTimeObj.toISOString(),
       duration: Number(duration),
       cost: cost ? Number(cost) : null,
       specials: selSpecials,
@@ -1908,14 +1911,14 @@ function AppointmentForm({ apt, clients, specials, onSave, onDelete, onCancel, o
         <div className="flex-1 relative group">
           <button
             onClick={handleSave}
-            disabled={!clientId || !date || !time}
+            disabled={!canSave}
             className="w-full py-3 bg-stone-800 text-amber-200 rounded-lg font-medium hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isEditing ? 'Guardar' : 'Crear'}
           </button>
-          {(!clientId || !date || !time) && (
+          {!canSave && (
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-stone-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-              {!clientId ? 'Selecciona un cliente' : !date ? 'Selecciona fecha' : 'Selecciona hora'}
+              {!clientId ? 'Selecciona un cliente' : !date ? 'Selecciona fecha' : !time ? 'Selecciona hora' : !duration || Number(duration) <= 0 ? 'Duración inválida' : 'Fecha/hora inválida'}
             </div>
           )}
         </div>
