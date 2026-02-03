@@ -344,8 +344,11 @@ export default function App() {
         }
         await addLog('edit_appointment', `${clientName} (${toUpdate.length} citas recurrentes)`);
       } else {
-        const { skipDates, ...aptData } = data;
-        await setDoc(doc(db, 'appointments', editItem.id), aptData);
+        const { skipDates, recurrence, recurrenceDuration, ...aptData } = data;
+        // Preservar seriesId original si existe
+        const updatedData = { ...aptData };
+        if (editItem.seriesId) updatedData.seriesId = editItem.seriesId;
+        await setDoc(doc(db, 'appointments', editItem.id), updatedData);
         await addLog('edit_appointment', `${clientName} - ${dateStr}`);
       }
     } else if (!isEditMode) {
